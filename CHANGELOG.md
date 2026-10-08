@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0 - 2026-10-08
+
+- One-shot shutdown timer, entered in hours and minutes. It confirms the time,
+  warns one minute before, pauses and greys out sleep while it runs, survives
+  shell restarts and is cancelled when the plugin is disabled or removed.
+- EN/DE language button in the panel.
+- The screensaver switch no longer rounds Omarchy's delay: switch and minutes
+  are written separately.
+- The panel warns when hypridle is missing and applies the timings once it
+  appears.
+- German header line reads "Energiesparmodus", like its section.
+
 ## 1.2.0 - 2026-10-08
 
 - Every section has the same small on/off switch next to its title. The

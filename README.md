@@ -1,12 +1,12 @@
 # Downtime 💤
 
-Screensaver, screen off, sleep and wallpaper rotation for [Omarchy](https://omarchy.org/), set from one bar widget.
+Screensaver, screen off, sleep, a shutdown timer and wallpaper rotation for [Omarchy](https://omarchy.org/), set from one bar widget.
 
 <p align="center">
-  <img src="preview.png" alt="Downtime panel: wallpaper rotation, screensaver, screen off and sleep timings" width="360">
+  <img src="preview.png" alt="Downtime panel: wallpaper rotation, screensaver, screen off, sleep and shutdown timer" width="360">
 </p>
 
-Omarchy can start a screensaver and lock on idle out of the box. Downtime adds the two steps after that: turn the screen off, then put the machine to sleep.
+Omarchy can start a screensaver and lock on idle out of the box. Downtime adds the steps after that: turn the screen off, put the machine to sleep, or shut it down at a set time.
 
 An independent [MIT](LICENSE)-licensed plugin. Not affiliated with or endorsed by 37signals.
 
@@ -20,12 +20,15 @@ Each setting has a small on/off switch next to its title. The minutes are kept w
 | Screensaver | unchanged | Omarchy's own `idle.screensaver` and screensaver toggle. Left exactly as they are until you change them in the widget. |
 | Screen off | 10 min | Via hypridle. |
 | Sleep | off, 30 min | Via hypridle and `systemctl suspend`. |
+| Shutdown timer | off, 1 h | One-shot, in hours and minutes. Counts real time, not idle time, and powers off with `systemctl poweroff`. |
 
 Things worth knowing:
 
 - **Times count from when the screensaver starts.** Opening the screensaver resets the idle clock. With screensaver 5 and sleep 30, the machine sleeps after about 35 minutes.
 - **Playing media keeps the machine awake.** Inhibitors from browsers and video players are respected.
 - **The screensaver is closed before sleep**, so you wake up to your desktop, not to the screensaver.
+- **The shutdown timer is one-shot.** The switch starts the countdown and cancels it. A notification confirms the time, and another one comes one minute before. Sleep is paused and greyed out while it runs, because a sleeping machine would never shut down. The timer survives a shell restart and is cancelled when the plugin is disabled or removed. The chosen time is kept for next time.
+- **The panel warns when hypridle is missing**, and starts the timings on its own once it is installed.
 - **Locking is not changed.** Omarchy still locks the screen before sleep. If you do not want a password after wake, see [Sleep without a password](#sleep-without-a-password).
 
 ## Install
@@ -57,6 +60,7 @@ Restart the shell after an update. A running shell can keep the old version of t
 - `Service.qml` reads the widget's settings straight from `~/.config/omarchy/shell.json` and runs `scripts/apply` whenever a timing changes, and once at login.
 - Enabling the plugin changes none of your settings. The screensaver stays as it is until you change it in the widget, and your `~/.config/hypr/hypridle.conf` is never touched.
 - `scripts/apply` takes exactly four values and refuses anything else, so a mismatched or half-updated caller changes nothing.
+- `scripts/shutdown` runs the shutdown timer as the transient user units `downtime-shutdown.timer` and `downtime-shutdown-warn.timer`, and keeps its deadline in `~/.local/state/downtime/shutdown-at`.
 - `scripts/apply` writes `~/.local/state/downtime/hypridle.conf` and runs hypridle with it as the user unit `downtime-hypridle.service`. Your own `~/.config/hypr/hypridle.conf` is never touched.
 - Disabling or removing the plugin stops that unit.
 
