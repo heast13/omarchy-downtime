@@ -130,6 +130,8 @@ Item {
     onFileChanged: reload()
     onLoaded: {
       var v = parseInt(text(), 10)
+      // Otherwise the time left counts from the last tick, up to 15 s ago.
+      root.now = Date.now() / 1000
       root.shutdownDeadline = isFinite(v) ? v : 0
     }
     onLoadFailed: root.shutdownDeadline = 0
