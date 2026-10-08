@@ -1,26 +1,53 @@
 #!/bin/bash
 # Downtime: dims every display while the screensaver runs and restores it after.
 #
-# Usage: dim down <percent> | dim up | dim check
+# Usage: dim down <percent> | dim up | dim check | dim probe
 #
-# "down" saves each display's brightness and lowers it to <percent> (displays
-# already at or below that are left alone). "up" restores the saved values.
-# "check" restores only when no screensaver is running, for a shell restart
-# that happened while the screen was dimmed.
+# down   saves each display's brightness and lowers it to <percent> (displays
+#        already at or below that are left alone).
+# up     restores the saved values, retrying while displays wake up.
+# check  restores only when no screensaver is running. The service calls it
+#        as a safety net whenever saved values are left behind.
+# probe  exits 0 when at least one display's brightness can be controlled,
+#        1 when none can, 3 when it cannot tell (busy, or every display off).
+#
+# Brightness goes through omarchy-brightness-display, the same path as the
+# brightness keys: backlight on laptops, DDC/CI on external monitors.
 set -u
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/downtime"
 SAVED="$STATE_DIR/dim-saved"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/downtime-dim.lock"
+RESTORE_SECONDS=180
 
 usage() {
-  echo "usage: dim down <percent> | dim up | dim check" >&2
+  echo "usage: dim down <percent> | dim up | dim check | dim probe" >&2
   exit 2
 }
 
 monitors() { hyprctl monitors -j 2>/dev/null | jq -r '.[].name'; }
-brightness() { omarchy-brightness-display --monitor "$1" 2>/dev/null; }
-set_brightness() { omarchy-brightness-display --no-osd --monitor "$1" "$2%" >/dev/null 2>&1; }
+# Displays that are connected and lit. DDC rarely answers while a display is off.
+lit_monitors() { hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.dpmsStatus) | .name'; }
 saver_running() { pgrep -f '[o]rg.omarchy.screensaver' >/dev/null; }
+
+brightness() {
+  local value
+  value=$(omarchy-brightness-display --monitor "$1" 2>/dev/null) || return 1
+  [[ $value =~ ^[0-9]+$ ]] || return 1
+  echo "$value"
+}
+
+# Some monitors acknowledge a write they ignore (often right after waking up),
+# so read it back. DDC rounding can be one step off.
+set_brightness() {
+  local monitor=$1 target=$2 now
+  for _ in 1 2 3; do
+    omarchy-brightness-display --no-osd --monitor "$monitor" "$target%" >/dev/null 2>&1
+    now=$(brightness "$monitor") && (( now >= target - 1 && now <= target + 1 )) && return 0
+    sleep 0.5
+  done
+  return 1
+}
 
 down() {
   local target=$1 monitor current
@@ -30,49 +57,84 @@ down() {
   : >"$SAVED"
   for monitor in $(monitors); do
     current=$(brightness "$monitor") || continue
-    [[ $current =~ ^[0-9]+$ ]] && (( current > target )) || continue
-    set_brightness "$monitor" "$target" && echo "$monitor $current" >>"$SAVED"
+    (( current > target )) || continue
+    # Saved before writing, so even a half-applied change gets restored.
+    echo "$monitor $current" >>"$SAVED"
+    set_brightness "$monitor" "$target"
   done
   [[ -s $SAVED ]] || rm -f "$SAVED"
 }
 
-# The display may still be waking up from screen off (or the machine from
-# sleep), when DDC does not answer yet, so keep trying for a while.
+# Restores every saved display until all are done or the time is up. A
+# display that is connected but still off (waking from screen off) is waited
+# for. One that is unplugged stays saved; the service's safety net restores
+# it once it is back.
 up() {
-  local monitor value pending
+  local deadline=$((SECONDS + $1)) monitor value connected lit left waiting
   [[ -f $SAVED ]] || return 0
-  for _ in {1..45}; do
-    pending=""
+  while :; do
+    connected=" $(monitors | tr '\n' ' ')"
+    lit=" $(lit_monitors | tr '\n' ' ')"
+    left=""
+    waiting=0
     while read -r monitor value; do
       [[ -n $monitor && $value =~ ^[0-9]+$ ]] || continue
-      set_brightness "$monitor" "$value" || pending+="$monitor $value"$'\n'
+      if [[ $lit == *" $monitor "* ]]; then
+        set_brightness "$monitor" "$value" && continue
+        waiting=1
+      elif [[ $connected == *" $monitor "* ]]; then
+        waiting=1
+      fi
+      left+="$monitor $value"$'\n'
     done <"$SAVED"
-    if [[ -z $pending ]]; then
+
+    if [[ -z $left ]]; then
       rm -f "$SAVED"
       return 0
     fi
-    printf '%s' "$pending" >"$SAVED"
+    printf '%s' "$left" >"$SAVED"
+    (( waiting && SECONDS < deadline )) || return 1
     sleep 2
   done
-  return 1
 }
 
-# Never let two runs interleave, or a restore races a new dim.
-exec 9>"${XDG_RUNTIME_DIR:-/tmp}/downtime-dim.lock"
-flock 9
+# Only lit displays count: one that is off cannot answer and is no proof.
+probe() {
+  local monitor any=0
+  for monitor in $(lit_monitors); do
+    any=1
+    brightness "$monitor" >/dev/null && return 0
+  done
+  (( any )) && return 1
+  return 3
+}
+
+mkdir -p "${LOCK%/*}"
+exec 9>"$LOCK"
 
 case "${1:-}" in
 down)
-  (( $# == 2 )) && [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 >= 1 && 10#$2 < 100 )) || usage
+  (( $# == 2 )) && [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 >= 1 && 10#$2 <= 99 )) || usage
+  # Never let two runs interleave, or a restore races a new dim.
+  flock 9
   down $(( 10#$2 ))
   ;;
 up)
   (( $# == 1 )) || usage
-  up
+  flock 9
+  up "$RESTORE_SECONDS"
   ;;
 check)
   (( $# == 1 )) || usage
-  saver_running || up
+  [[ -f $SAVED ]] || exit 0
+  # Runs repeatedly; skip while a dim or restore is already at work.
+  flock -n 9 || exit 0
+  saver_running || up 10
+  ;;
+probe)
+  (( $# == 1 )) || usage
+  flock -n 9 || exit 3
+  probe
   ;;
 *) usage ;;
 esac

@@ -151,12 +151,47 @@ Item {
 
   function runDim(args) { Quickshell.execDetached([root.dimScript].concat(args)) }
 
+  // Whether any display's brightness can be controlled at all. The widget
+  // greys out dimming when not. Assumed until a probe says otherwise, and a
+  // probe that cannot tell (busy, displays off) keeps the last answer.
+  property bool dimSupported: true
+
+  function probeDim() {
+    if (!dimProbe.running) dimProbe.running = true
+  }
+
+  Process {
+    id: dimProbe
+    command: [root.dimScript, "probe"]
+    onExited: function(code) {
+      if (code === 0) root.dimSupported = true
+      else if (code === 1) root.dimSupported = false
+    }
+  }
+
+  // Displays need a moment after being plugged in before they answer.
+  Timer {
+    id: dimProbeDelay
+    interval: 3000
+    onTriggered: root.probeDim()
+  }
+
+  // Safety net: saved brightness left behind while no screensaver is known to
+  // run (a missed close event, a display that was off) gets restored.
+  FileView {
+    id: dimSavedFile
+    path: root.stateDir + "/dim-saved"
+    printErrors: false
+    onLoaded: if (Object.keys(root.saverWindows).length === 0) root.runDim(["check"])
+  }
+
   Connections {
     target: Hyprland
     function onRawEvent(event) {
       var parts = String(event.data || "").split(",")
       if (event.name === "openwindow" && parts[2] === "org.omarchy.screensaver") root.setSaverWindow(parts[0], true)
       else if (event.name === "closewindow" && root.saverWindows[parts[0]]) root.setSaverWindow(parts[0], false)
+      else if (/^monitor(added|removed)/.test(event.name)) dimProbeDelay.restart()
     }
   }
 
@@ -186,6 +221,7 @@ Item {
     onTriggered: {
       root.now = Date.now() / 1000
       shutdownFile.reload()
+      dimSavedFile.reload()
       if (root.hypridleMissing) root.checkHypridle()
     }
   }
@@ -215,6 +251,7 @@ Item {
     runShutdown(["check"])
     // A shell restart while dimmed loses track of the screensaver windows.
     runDim(["check"])
+    probeDim()
     checkHypridle()
   }
 

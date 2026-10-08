@@ -24,6 +24,9 @@ Panel {
   readonly property int screensaverMinutes: intSetting("screensaverMinutes",
     service ? Math.max(1, Math.round(service.systemSaverSeconds / 60)) : 5, 1)
   readonly property bool dimEnabled: Settings.dimEnabled(settings)
+  readonly property bool dimSupported: !service || service.dimSupported
+  // Dimming follows the screensaver and needs a display whose brightness can be set.
+  readonly property bool dimAvailable: screensaverEnabled && dimSupported
   readonly property int dimPercent: Settings.dimPercent(settings)
   readonly property bool screenOffEnabled: Settings.enabled(settings, "screenOff")
   readonly property int screenOffMinutes: Settings.minutes(settings, "screenOff")
@@ -76,6 +79,9 @@ Panel {
   }
 
   function nextWallpaper() { Quickshell.execDetached(["omarchy-theme-bg-next"]) }
+
+  // Displays come and go, so ask again whenever the panel opens.
+  onOpenedChanged: if (opened && service) service.probeDim()
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -283,18 +289,29 @@ Panel {
         // ---------- Dim ----------
         PanelSeparator { foreground: root.fg }
 
-        // Dimming follows the screensaver, so it is greyed out while that is off.
+        // Greyed out while the screensaver is off or no display can be dimmed.
+        // The stored setting stays, so it works again on a capable display.
         SwitchHeader {
           text: root.tr("dim")
-          enabled: root.screensaverEnabled
+          enabled: root.dimAvailable
           opacity: enabled ? 1 : 0.4
-          checked: root.dimEnabled
+          checked: root.dimEnabled && root.dimSupported
           onToggled: root.persist({ screensaverDimEnabled: !root.dimEnabled, screensaverDimPercent: root.dimPercent })
+        }
+
+        Text {
+          width: parent.width
+          visible: !root.dimSupported
+          text: root.tr("dimUnsupported")
+          wrapMode: Text.WordWrap
+          color: Qt.darker(root.fg, 1.4)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
         }
 
         NumberField {
           width: parent.width
-          visible: root.dimEnabled
+          visible: root.dimEnabled && root.dimSupported
           enabled: root.screensaverEnabled
           opacity: enabled ? 1 : 0.4
           label: root.tr("dimTo")
