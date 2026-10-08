@@ -1,0 +1,92 @@
+#!/bin/bash
+# Downtime: a one-shot shutdown timer.
+#
+# Usage: shutdown start <minutes> [en|de]   power off in <minutes>, replacing a running timer
+#        shutdown cancel [en|de]            cancel the running timer
+#        shutdown check                     forget a timer that is no longer running
+#
+# The timer runs as transient user units, so it survives shell restarts. Its
+# deadline (epoch seconds) lives in a state file the widget watches.
+set -u
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/downtime"
+DEADLINE_FILE="$STATE_DIR/shutdown-at"
+UNIT=downtime-shutdown
+WARN_UNIT=downtime-shutdown-warn
+MAX_MIN=1440
+
+usage() {
+  echo "usage: shutdown start <minutes> [en|de] | cancel [en|de] | check" >&2
+  exit 2
+}
+
+stop_units() {
+  systemctl --user stop "$UNIT.timer" "$WARN_UNIT.timer" 2>/dev/null
+  systemctl --user reset-failed "$UNIT.service" "$WARN_UNIT.service" 2>/dev/null
+}
+
+# Messages follow the widget's language.
+msg() {
+  local key=$1 lang=$2 arg=${3:-}
+  case $lang:$key in
+    de:at) echo "Fährt um $arg herunter." ;;
+    de:warn) echo "Fährt in 1 Minute herunter." ;;
+    de:cancel) echo "Ausschalt-Timer abgebrochen." ;;
+    *:at) echo "Shutting down at $arg." ;;
+    *:warn) echo "Shutting down in 1 minute." ;;
+    *:cancel) echo "Shutdown timer cancelled." ;;
+  esac
+}
+
+lang_arg() {
+  [[ -z ${1:-} || $1 == en || $1 == de ]] || usage
+  echo "${1:-en}"
+}
+
+notify() {
+  omarchy-notification-send -g 󰐥 "Downtime" "$1" >/dev/null 2>&1 || true
+}
+
+case ${1:-} in
+  start)
+    (( $# == 2 || $# == 3 )) || usage
+    [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 >= 1 && 10#$2 <= MAX_MIN )) || usage
+    minutes=$(( 10#$2 ))
+    lang=$(lang_arg "${3:-}") || exit 2
+
+    stop_units
+    deadline=$(( $(date +%s) + minutes * 60 ))
+    systemd-run --user --quiet --collect --unit="$UNIT" \
+      --on-active="${minutes}min" --timer-property=AccuracySec=1s \
+      systemctl poweroff || exit 1
+    if (( minutes >= 2 )); then
+      systemd-run --user --quiet --collect --unit="$WARN_UNIT" \
+        --on-active="$(( minutes - 1 ))min" --timer-property=AccuracySec=1s \
+        omarchy-notification-send -u critical -g 󰐥 "Downtime" "$(msg warn "$lang")" >/dev/null
+    fi
+
+    mkdir -p "$STATE_DIR"
+    echo "$deadline" >"$DEADLINE_FILE.tmp" && mv -f "$DEADLINE_FILE.tmp" "$DEADLINE_FILE"
+    notify "$(msg at "$lang" "$(date -d "@$deadline" +%H:%M)")"
+    ;;
+  cancel)
+    (( $# == 1 || $# == 2 )) || usage
+    lang=$(lang_arg "${2:-}") || exit 2
+    stop_units
+    if [[ -f $DEADLINE_FILE ]]; then
+      rm -f "$DEADLINE_FILE"
+      notify "$(msg cancel "$lang")"
+    fi
+    ;;
+  check)
+    (( $# == 1 )) || usage
+    # After a reboot or a manual stop the file outlives its timer.
+    if [[ -f $DEADLINE_FILE ]] && ! systemctl --user is-active --quiet "$UNIT.timer"; then
+      rm -f "$DEADLINE_FILE"
+    fi
+    ;;
+  *)
+    usage
+    ;;
+esac
+exit 0

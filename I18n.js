@@ -22,7 +22,14 @@ var strings = {
     sleepIn: "Sleep",
     tooltipRotate: "Wallpaper every %1 min · Right-click: next",
     tooltipManual: "Downtime · Right-click: next wallpaper",
-    languageTooltip: "Switch to German"
+    languageTooltip: "Switch to German",
+    shutdown: "SHUTDOWN TIMER",
+    shutdownAfter: "Shut down in … min",
+    shutdownAt: "Shuts down at %1",
+    timeLeft: "%1 left",
+    shutdownHero: "Shutdown %1",
+    sleepPaused: "Paused while the shutdown timer runs.",
+    tooltipShutdown: "Shutting down at %1"
   },
   de: {
     title: "Downtime",
@@ -43,7 +50,14 @@ var strings = {
     sleepIn: "Energiesparmodus",
     tooltipRotate: "Wallpaper alle %1 Min · Rechtsklick: weiter",
     tooltipManual: "Downtime · Rechtsklick: nächstes Wallpaper",
-    languageTooltip: "Auf Englisch umstellen"
+    languageTooltip: "Auf Englisch umstellen",
+    shutdown: "AUSSCHALT-TIMER",
+    shutdownAfter: "Herunterfahren in … Min",
+    shutdownAt: "Fährt um %1 herunter",
+    timeLeft: "noch %1",
+    shutdownHero: "Ausschalten %1",
+    sleepPaused: "Pausiert, solange der Ausschalt-Timer läuft.",
+    tooltipShutdown: "Fährt um %1 herunter"
   }
 }
 

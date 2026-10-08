@@ -27,6 +27,21 @@ Panel {
   readonly property int screenOffMinutes: Settings.minutes(settings, "screenOff")
   readonly property bool suspendEnabled: Settings.enabled(settings, "suspend")
   readonly property int suspendMinutes: Settings.minutes(settings, "suspend")
+  readonly property int shutdownMinutes: Settings.minutes(settings, "shutdown")
+  readonly property bool shutdownActive: !!service && service.shutdownActive
+  // Weekday only when the deadline is not today, e.g. "Fri 15:32".
+  readonly property string shutdownTime: {
+    if (!shutdownActive) return ""
+    var at = new Date(service.shutdownDeadline * 1000)
+    var today = new Date(service.now * 1000).toDateString() === at.toDateString()
+    return at.toLocaleString(Qt.locale(root.lang === "de" ? "de_DE" : "en_US"), today ? "HH:mm" : "ddd HH:mm")
+  }
+  readonly property string shutdownLeft: {
+    var m = service ? service.shutdownMinutesLeft : 0
+    var min = root.tr("min").toLowerCase()
+    if (m < 60) return m + " " + min
+    return Math.floor(m / 60) + " h" + (m % 60 ? " " + (m % 60) + " " + min : "")
+  }
 
   function tr(key, arg) { return I18n.tr(root.lang, key, arg) }
 
@@ -105,9 +120,10 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: String.fromCodePoint(0xF0904)
-    tooltipText: root.wallpaperEnabled
-      ? root.tr("tooltipRotate", root.wallpaperMinutes)
+    // A running shutdown timer swaps the moon for a power icon.
+    text: String.fromCodePoint(root.shutdownActive ? 0xF0425 : 0xF0904)
+    tooltipText: root.shutdownActive ? root.tr("tooltipShutdown", root.shutdownTime)
+      : root.wallpaperEnabled ? root.tr("tooltipRotate", root.wallpaperMinutes)
       : root.tr("tooltipManual")
     onPressed: function(b) {
       if (b === Qt.RightButton) root.nextWallpaper()
@@ -174,8 +190,9 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              text: (root.tr("sleepIn") + " "
-                + (root.suspendEnabled ? root.suspendMinutes + " " + root.tr("min") : root.tr("off"))).toUpperCase()
+              text: (root.shutdownActive ? root.tr("shutdownHero", root.shutdownTime)
+                : root.tr("sleepIn") + " "
+                  + (root.suspendEnabled ? root.suspendMinutes + " " + root.tr("min") : root.tr("off"))).toUpperCase()
               color: Qt.darker(root.fg, 1.4)
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -292,30 +309,86 @@ Panel {
           onModified: function(v) { root.persistTiming("suspend", true, v) }
         }
 
-        // Note on the left, the small language switch on the right.
-        Item {
+        Text {
           width: parent.width
-          implicitHeight: Math.max(note.implicitHeight, langButton.implicitHeight)
+          text: root.tr("sleepNote")
+          wrapMode: Text.WordWrap
+          color: Qt.darker(root.fg, 1.4)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+
+        Text {
+          width: parent.width
+          visible: root.shutdownActive && root.suspendEnabled
+          text: root.tr("sleepPaused")
+          wrapMode: Text.WordWrap
+          color: Qt.darker(root.fg, 1.4)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+
+        // ---------- Shutdown timer ----------
+        // One-shot: the switch starts or cancels a countdown in real time.
+        PanelSeparator { foreground: root.fg }
+
+        SwitchHeader {
+          text: root.tr("shutdown")
+          checked: root.shutdownActive
+          onToggled: {
+            if (!root.service) return
+            if (root.shutdownActive) root.service.cancelShutdown()
+            else root.service.startShutdown(root.shutdownMinutes)
+          }
+        }
+
+        NumberField {
+          width: parent.width
+          visible: !root.shutdownActive
+          label: root.tr("shutdownAfter")
+          fieldWidth: width
+          foreground: root.fg
+          fontFamily: root.fontFamily
+          from: 1
+          to: Settings.MAX_MINUTES
+          value: root.shutdownMinutes
+          onModified: function(v) { root.persist({ shutdownMinutes: v }) }
+        }
+
+        Column {
+          width: parent.width
+          visible: root.shutdownActive
+          spacing: Style.space(2)
 
           Text {
-            id: note
-            anchors.left: parent.left
-            anchors.right: langButton.left
-            anchors.rightMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.tr("sleepNote")
-            wrapMode: Text.WordWrap
+            width: parent.width
+            text: root.tr("shutdownAt", root.shutdownTime)
+            elide: Text.ElideRight
+            color: root.fg
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+          }
+
+          Text {
+            width: parent.width
+            text: root.tr("timeLeft", root.shutdownLeft)
+            elide: Text.ElideRight
             color: Qt.darker(root.fg, 1.4)
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
+        }
+
+        // The small language switch, bottom right.
+        Item {
+          width: parent.width
+          implicitHeight: langButton.implicitHeight
 
           // Omarchy has no settings window for plugins, so the language
           // switch lives here. A click picks the other language explicitly.
           Button {
             id: langButton
             anchors.right: parent.right
-            anchors.bottom: parent.bottom
             text: root.lang.toUpperCase()
             tooltipText: root.tr("languageTooltip")
             foreground: root.fg

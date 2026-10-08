@@ -12,7 +12,9 @@ var MAX_MINUTES = 1440
 var timings = {
   wallpaper: { flag: "wallpaperEnabled", minutes: "wallpaperMinutes", on: false, fallback: 10 },
   screenOff: { flag: "screenOffEnabled", minutes: "screenOffMinutes", on: true, fallback: 10 },
-  suspend: { flag: "suspendEnabled", minutes: "suspendMinutes", on: false, fallback: 30 }
+  suspend: { flag: "suspendEnabled", minutes: "suspendMinutes", on: false, fallback: 30 },
+  // One-shot: only the minutes are stored. Whether it runs is live state.
+  shutdown: { flag: "", minutes: "shutdownMinutes", on: false, fallback: 60 }
 }
 
 function storedMinutes(settings, key) {

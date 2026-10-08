@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Settings.js" as Settings
+import "I18n.js" as I18n
 
 // Headless half of Downtime. It reads its settings straight from shell.json
 // instead of waiting for the bar widget to push them, so it works the same
@@ -17,6 +18,8 @@ Item {
     ? String(manifest.__sourceDir)
     : Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "").replace(/\/$/, "")
   readonly property string applyScript: pluginDir + "/scripts/apply"
+  readonly property string shutdownScript: pluginDir + "/scripts/shutdown"
+  readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/downtime"
 
   property var settings: ({})
   property var idleConfig: ({})
@@ -34,6 +37,14 @@ Item {
   readonly property int screensaverMinutes: Math.min(Settings.MAX_MINUTES, Math.max(1, num("screensaverMinutes", 5)))
   readonly property int screenOffMinutes: Settings.effectiveMinutes(settings, "screenOff")
   readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend")
+  readonly property string lang: I18n.language(settings ? settings.language : "auto", Qt.locale().name)
+
+  // One-shot shutdown timer. The deadline (epoch seconds) comes from the state
+  // file written by scripts/shutdown; the timer itself runs in systemd.
+  property real shutdownDeadline: 0
+  property real now: Date.now() / 1000
+  readonly property bool shutdownActive: shutdownDeadline > now
+  readonly property int shutdownMinutesLeft: shutdownActive ? Math.ceil((shutdownDeadline - now) / 60) : 0
 
   // The screensaver is Omarchy's own setting. Leave it alone until the user
   // changes it in this widget, so enabling the plugin overwrites nothing.
@@ -48,7 +59,8 @@ Item {
     screensaverManaged ? (screensaverEnabled ? "on" : "off") : "keep",
     screensaverManaged ? String(screensaverMinutes) : "keep",
     String(screenOffMinutes),
-    String(suspendMinutes)
+    // Sleep would stop the shutdown timer from ever firing, so it pauses.
+    String(shutdownActive ? 0 : suspendMinutes)
   ]
 
   // The bar widget lives in bar.layout, or as a top-level entry in plugins[].
@@ -104,6 +116,50 @@ Item {
     onLoadFailed: root.systemSaverOff = false
   }
 
+  FileView {
+    id: shutdownFile
+    path: root.stateDir + "/shutdown-at"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      var v = parseInt(text(), 10)
+      root.shutdownDeadline = isFinite(v) ? v : 0
+    }
+    onLoadFailed: root.shutdownDeadline = 0
+  }
+
+  function startShutdown(minutes) {
+    runShutdown(["start", String(Math.max(1, Math.min(Settings.MAX_MINUTES, Math.floor(minutes)))), root.lang])
+  }
+
+  function cancelShutdown() { runShutdown(["cancel", root.lang]) }
+
+  function runShutdown(args) {
+    if (shutdownProc.running) return
+    shutdownProc.command = [root.shutdownScript].concat(args)
+    shutdownProc.running = true
+  }
+
+  // A newly created file is not watched yet, so reload once the script is done.
+  Process {
+    id: shutdownProc
+    onExited: shutdownFile.reload()
+  }
+
+  // Keeps the countdown current and notices a timer that ended elsewhere.
+  Timer {
+    interval: 15000
+    running: true
+    repeat: true
+    onTriggered: {
+      root.now = Date.now() / 1000
+      shutdownFile.reload()
+    }
+  }
+
+  Component.onCompleted: runShutdown(["check"])
+
   Timer {
     id: wallpaperTimer
     interval: Math.max(1, root.wallpaperMinutes) * 60000
@@ -125,12 +181,13 @@ Item {
   }
 
   // A hot-reload destroys and recreates this object too, so wait and only stop
-  // hypridle when the plugin really is disabled or removed. Inline rather than
-  // in scripts/: on removal the plugin folder is already gone.
+  // hypridle and a running shutdown timer when the plugin really is disabled or
+  // removed. Inline rather than in scripts/: on removal the folder is gone.
   Component.onDestruction: Quickshell.execDetached([
     "systemd-run", "--user", "--quiet", "--collect", "bash", "-c",
     "sleep 3; omarchy plugin list --json | jq -e --arg id \"$1\" 'any(.[]; .id == $id and .enabled)' >/dev/null"
-      + " || systemctl --user stop downtime-hypridle.service",
-    "downtime-stop", root.pluginId
+      + " || { systemctl --user stop downtime-hypridle.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
+      + " rm -f \"$2/shutdown-at\"; }",
+    "downtime-stop", root.pluginId, root.stateDir
   ])
 }
