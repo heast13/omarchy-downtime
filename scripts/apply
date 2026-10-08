@@ -2,7 +2,9 @@
 # Downtime: applies the screensaver delay (shell.json) and the screen-off and
 # sleep delays (its own hypridle instance).
 #
-# Usage: apply <on|off> <screensaver-minutes> <screen-off-minutes> <sleep-minutes>
+# Usage: apply <on|off|keep> <screensaver-minutes|keep> <screen-off-minutes> <sleep-minutes>
+#
+# "keep keep" leaves Omarchy's screensaver settings exactly as they are.
 set -u
 
 SHELL_JSON="$HOME/.config/omarchy/shell.json"
@@ -12,7 +14,7 @@ UNIT=downtime-hypridle.service
 MAX_MIN=1440
 
 usage() {
-  echo "usage: apply <on|off> <screensaver-minutes> <screen-off-minutes> <sleep-minutes>" >&2
+  echo "usage: apply <on|off|keep> <screensaver-minutes|keep> <screen-off-minutes> <sleep-minutes>" >&2
   exit 2
 }
 
@@ -20,12 +22,18 @@ usage() {
 # lock the session on the spot (see below).
 (( $# == 4 )) || usage
 SAVER_STATE=$1
-[[ $SAVER_STATE == on || $SAVER_STATE == off ]] || usage
-for value in "$2" "$3" "$4"; do
+case $SAVER_STATE in
+  on | off) minutes=("$2" "$3" "$4") ;;
+  keep) [[ $2 == keep ]] || usage; minutes=("$3" "$4") ;;
+  *) usage ;;
+esac
+for value in "${minutes[@]}"; do
   [[ $value =~ ^[0-9]+$ ]] && (( 10#$value <= MAX_MIN )) || usage
 done
-SAVER=$(( 10#$2 * 60 ))
-(( SAVER >= 60 )) || SAVER=60
+if [[ $SAVER_STATE != keep ]]; then
+  SAVER=$(( 10#$2 * 60 ))
+  (( SAVER >= 60 )) || SAVER=60
+fi
 OFF_MIN=$(( 10#$3 ))
 SUSPEND_MIN=$(( 10#$4 ))
 
@@ -35,61 +43,64 @@ flock 9
 
 # ---------- screensaver (Omarchy's own idle service) ----------
 
-# "Off" uses Omarchy's own screensaver toggle (the same one as in its menu) and
-# keeps idle.screensaver a real delay. Writing a huge "never" value instead
-# breaks Omarchy's idle timer: when it is as large as idle.lock, the shell locks
-# the session the moment its idle monitor restarts.
-if [[ $SAVER_STATE == off ]]; then
-  omarchy-toggle screensaver-off on
-else
-  omarchy-toggle screensaver-off off
-fi
-
-file_saver() { jq -r '.idle.screensaver // empty' "$SHELL_JSON" 2>/dev/null; }
-shell_status() { omarchy-shell idle status 2>/dev/null | jq -r ".$1 // empty" 2>/dev/null; }
-
-# Write atomically: a finished copy in the same folder, then rename, so the
-# shell never reads half a file.
-write_saver() {
-  local tmp
-  tmp=$(mktemp "$SHELL_JSON.XXXXXX") || return 1
-  if jq --argjson s "$SAVER" '.idle = ((.idle // {}) + {screensaver: $s})' "$SHELL_JSON" >"$tmp" \
-    && jq -e . "$tmp" >/dev/null 2>&1; then
-    chmod --reference="$SHELL_JSON" "$tmp"
-    mv -f "$tmp" "$SHELL_JSON"
+# Untouched until the user sets it in the widget.
+if [[ $SAVER_STATE != keep ]]; then
+  # "Off" uses Omarchy's own screensaver toggle (the same one as in its menu) and
+  # keeps idle.screensaver a real delay. Writing a huge "never" value instead
+  # breaks Omarchy's idle timer: when it is as large as idle.lock, the shell locks
+  # the session the moment its idle monitor restarts.
+  if [[ $SAVER_STATE == off ]]; then
+    omarchy-toggle screensaver-off on
   else
-    rm -f "$tmp"
-    return 1
+    omarchy-toggle screensaver-off off
   fi
-}
 
-SHELL_SAVER_BEFORE=$(shell_status screensaver)
+  file_saver() { jq -r '.idle.screensaver // empty' "$SHELL_JSON" 2>/dev/null; }
+  shell_status() { omarchy-shell idle status 2>/dev/null | jq -r ".$1 // empty" 2>/dev/null; }
 
-if [[ -f $SHELL_JSON ]]; then
-  # The shell also writes shell.json from memory (for example when widget
-  # settings are saved). If it catches a stale copy, our value is lost again,
-  # so keep checking until file and shell agree.
-  for _ in {1..10}; do
-    [[ $(file_saver) != "$SAVER" ]] && write_saver
+  # Write atomically: a finished copy in the same folder, then rename, so the
+  # shell never reads half a file.
+  write_saver() {
+    local tmp
+    tmp=$(mktemp "$SHELL_JSON.XXXXXX") || return 1
+    if jq --argjson s "$SAVER" '.idle = ((.idle // {}) + {screensaver: $s})' "$SHELL_JSON" >"$tmp" \
+      && jq -e . "$tmp" >/dev/null 2>&1; then
+      chmod --reference="$SHELL_JSON" "$tmp"
+      mv -f "$tmp" "$SHELL_JSON"
+    else
+      rm -f "$tmp"
+      return 1
+    fi
+  }
+
+  SHELL_SAVER_BEFORE=$(shell_status screensaver)
+
+  if [[ -f $SHELL_JSON ]]; then
+    # The shell also writes shell.json from memory (for example when widget
+    # settings are saved). If it catches a stale copy, our value is lost again,
+    # so keep checking until file and shell agree.
+    for _ in {1..10}; do
+      [[ $(file_saver) != "$SAVER" ]] && write_saver
+      sleep 0.5
+      [[ $(file_saver) == "$SAVER" && $(shell_status screensaver) == "$SAVER" ]] && break
+    done
+  fi
+
+  # The shell's IdleMonitor never fires again after its timeout changes at
+  # runtime, so recreate it (off/on) - unless idle is deliberately off (Stay
+  # Awake). The off state is persisted, so every exit path turns it back on.
+  if [[ $SHELL_SAVER_BEFORE != "$SAVER" && $(shell_status enabled) == true ]]; then
+    trap 'omarchy-shell -q idle enable >/dev/null 2>&1' EXIT
+    trap 'exit 1' INT TERM HUP
+    omarchy-shell -q idle disable >/dev/null 2>&1
     sleep 0.5
-    [[ $(file_saver) == "$SAVER" && $(shell_status screensaver) == "$SAVER" ]] && break
-  done
-fi
-
-# The shell's IdleMonitor never fires again after its timeout changes at
-# runtime, so recreate it (off/on) - unless idle is deliberately off (Stay
-# Awake). The off state is persisted, so every exit path turns it back on.
-if [[ $SHELL_SAVER_BEFORE != "$SAVER" && $(shell_status enabled) == true ]]; then
-  trap 'omarchy-shell -q idle enable >/dev/null 2>&1' EXIT
-  trap 'exit 1' INT TERM HUP
-  omarchy-shell -q idle disable >/dev/null 2>&1
-  sleep 0.5
-  for _ in {1..10}; do
-    omarchy-shell -q idle enable >/dev/null 2>&1
-    [[ $(shell_status enabled) == true ]] && break
-    sleep 0.5
-  done
-  trap - EXIT INT TERM HUP
+    for _ in {1..10}; do
+      omarchy-shell -q idle enable >/dev/null 2>&1
+      [[ $(shell_status enabled) == true ]] && break
+      sleep 0.5
+    done
+    trap - EXIT INT TERM HUP
+  fi
 fi
 
 # ---------- screen off and sleep (hypridle) ----------

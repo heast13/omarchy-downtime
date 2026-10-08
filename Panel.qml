@@ -9,13 +9,18 @@ Panel {
   moduleName: "heast13.downtime"
   ipcTarget: "downtime.panel"
 
+  readonly property var service: bar && bar.shell && typeof bar.shell.serviceFor === "function"
+    ? bar.shell.serviceFor(moduleName) : null
   readonly property color fg: bar ? bar.foreground : Color.foreground
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property string lang: I18n.language(setting("language", "auto"), Qt.locale().name)
 
   readonly property int wallpaperMinutes: intSetting("wallpaperMinutes", 0, 0)
-  readonly property bool screensaverEnabled: setting("screensaverEnabled", true) !== false
-  readonly property int screensaverMinutes: intSetting("screensaverMinutes", 5, 1)
+  // Until the user sets the screensaver here, show what Omarchy currently uses.
+  readonly property bool screensaverEnabled: setting("screensaverEnabled",
+    service ? !service.systemSaverOff : true) !== false
+  readonly property int screensaverMinutes: intSetting("screensaverMinutes",
+    service ? Math.max(1, Math.round(service.systemSaverSeconds / 60)) : 5, 1)
   readonly property int screenOffMinutes: intSetting("screenOffMinutes", 10, 0)
   readonly property int suspendMinutes: intSetting("suspendMinutes", 0, 0)
 
@@ -184,7 +189,7 @@ Panel {
           checked: root.screensaverEnabled
           foreground: root.fg
           fontFamily: root.fontFamily
-          onClicked: root.persist({ screensaverEnabled: !root.screensaverEnabled })
+          onClicked: root.persist({ screensaverEnabled: !root.screensaverEnabled, screensaverMinutes: root.screensaverMinutes })
         }
 
         NumberField {
@@ -197,7 +202,7 @@ Panel {
           from: 1
           to: 1440
           value: root.screensaverMinutes
-          onModified: function(v) { root.persist({ screensaverMinutes: v }) }
+          onModified: function(v) { root.persist({ screensaverEnabled: root.screensaverEnabled, screensaverMinutes: v }) }
         }
 
         // ---------- Screen off ----------

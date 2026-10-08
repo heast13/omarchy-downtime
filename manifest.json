@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "heast13.downtime",
   "name": "Downtime",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "heast13",
   "description": "Screensaver, screen-off, sleep and wallpaper rotation timings in one bar widget.",
   "kinds": ["service", "bar-widget"],
@@ -19,8 +19,6 @@
     "defaultSection": "right",
     "defaults": {
       "wallpaperMinutes": 0,
-      "screensaverEnabled": true,
-      "screensaverMinutes": 5,
       "screenOffMinutes": 10,
       "suspendMinutes": 0,
       "language": "auto"

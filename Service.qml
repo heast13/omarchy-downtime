@@ -18,6 +18,8 @@ Item {
   readonly property string applyScript: pluginDir + "/scripts/apply"
 
   property var settings: ({})
+  property var idleConfig: ({})
+  property bool systemSaverOff: false
   property bool configLoaded: false
   property string appliedKey: ""
 
@@ -32,9 +34,18 @@ Item {
   readonly property int screenOffMinutes: Math.min(1440, num("screenOffMinutes", 10))
   readonly property int suspendMinutes: Math.min(1440, num("suspendMinutes", 0))
 
+  // The screensaver is Omarchy's own setting. Leave it alone until the user
+  // changes it in this widget, so enabling the plugin overwrites nothing.
+  readonly property bool screensaverManaged: !!settings
+    && (settings.screensaverEnabled !== undefined || settings.screensaverMinutes !== undefined)
+  readonly property int systemSaverSeconds: {
+    var v = Number(idleConfig ? idleConfig.screensaver : undefined)
+    return isFinite(v) && v > 0 ? Math.floor(v) : 150
+  }
+
   readonly property var applyArgs: [
-    screensaverEnabled ? "on" : "off",
-    String(screensaverMinutes),
+    screensaverManaged ? (screensaverEnabled ? "on" : "off") : "keep",
+    screensaverManaged ? String(screensaverMinutes) : "keep",
     String(screenOffMinutes),
     String(suspendMinutes)
   ]
@@ -69,7 +80,9 @@ Item {
     onFileChanged: reload()
     onLoaded: {
       try {
-        root.settings = root.findEntry(JSON.parse(text()))
+        var config = JSON.parse(text())
+        root.settings = root.findEntry(config)
+        root.idleConfig = config && config.idle ? config.idle : ({})
       } catch (e) {
         // Caught mid-write; the next change notification reloads it.
         return
@@ -77,6 +90,17 @@ Item {
       root.configLoaded = true
       root.scheduleApply()
     }
+  }
+
+  // Omarchy's screensaver on/off toggle, shown by the widget until the user
+  // takes over the screensaver here.
+  FileView {
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/toggles/screensaver-off"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.systemSaverOff = true
+    onLoadFailed: root.systemSaverOff = false
   }
 
   Timer {

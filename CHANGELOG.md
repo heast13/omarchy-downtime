@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 - 2026-10-08
+
+- Enabling the plugin no longer changes the screensaver. Omarchy's screensaver
+  delay and toggle stay as they are until you change them in the widget, and
+  the widget shows the current values until then.
+
 ## 1.0.0 - 2026-10-08
 
 First release.

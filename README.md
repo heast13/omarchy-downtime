@@ -15,7 +15,7 @@ An independent [MIT](LICENSE)-licensed plugin. Not affiliated with or endorsed b
 | Setting | Default | Notes |
 | --- | --- | --- |
 | Wallpaper rotation | off | Calls `omarchy-theme-bg-next`. Right-click the widget for the next one. |
-| Screensaver | 5 min | Sets Omarchy's own `idle.screensaver`. Off uses Omarchy's screensaver toggle, the same one as in its menu. |
+| Screensaver | unchanged | Omarchy's own `idle.screensaver` and screensaver toggle. Left exactly as they are until you change them in the widget. |
 | Screen off | 10 min | Via hypridle. |
 | Sleep | off | Via hypridle and `systemctl suspend`. |
 
@@ -53,6 +53,7 @@ Restart the shell after an update. A running shell can keep the old version of t
 ## How it works
 
 - `Service.qml` reads the widget's settings straight from `~/.config/omarchy/shell.json` and runs `scripts/apply` whenever a timing changes, and once at login.
+- Enabling the plugin changes none of your settings. The screensaver stays as it is until you change it in the widget, and your `~/.config/hypr/hypridle.conf` is never touched.
 - `scripts/apply` takes exactly four values and refuses anything else, so a mismatched or half-updated caller changes nothing.
 - `scripts/apply` writes `~/.local/state/downtime/hypridle.conf` and runs hypridle with it as the user unit `downtime-hypridle.service`. Your own `~/.config/hypr/hypridle.conf` is never touched.
 - Disabling or removing the plugin stops that unit.
