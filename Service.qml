@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import "Settings.js" as Settings
 import "I18n.js" as I18n
@@ -19,6 +20,7 @@ Item {
     : Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "").replace(/\/$/, "")
   readonly property string applyScript: pluginDir + "/scripts/apply"
   readonly property string shutdownScript: pluginDir + "/scripts/shutdown"
+  readonly property string dimScript: pluginDir + "/scripts/dim"
   readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/downtime"
 
   property var settings: ({})
@@ -37,6 +39,8 @@ Item {
   readonly property int screensaverMinutes: Math.min(Settings.MAX_MINUTES, Math.max(1, num("screensaverMinutes", 5)))
   readonly property int screenOffMinutes: Settings.effectiveMinutes(settings, "screenOff")
   readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend")
+  // Brightness while the screensaver runs; 100 leaves the displays alone.
+  readonly property int dimPercent: Math.min(100, Math.max(1, num("screensaverDimPercent", 100)))
   readonly property string lang: I18n.language(settings ? settings.language : "auto", Qt.locale().name)
 
   // One-shot shutdown timer. The deadline (epoch seconds) comes from the state
@@ -130,6 +134,32 @@ Item {
     onLoadFailed: root.shutdownDeadline = 0
   }
 
+  // Dims the displays while any screensaver window is open (one per monitor)
+  // and restores them once the last one closes.
+  property var saverWindows: ({})
+
+  function setSaverWindow(address, open) {
+    var next = {}
+    for (var a in saverWindows) if (a !== address) next[a] = true
+    if (open) next[address] = true
+    var before = Object.keys(saverWindows).length
+    var after = Object.keys(next).length
+    saverWindows = next
+    if (before === 0 && after > 0 && dimPercent < 100) runDim(["down", String(dimPercent)])
+    else if (before > 0 && after === 0) runDim(["up"])
+  }
+
+  function runDim(args) { Quickshell.execDetached([root.dimScript].concat(args)) }
+
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      var parts = String(event.data || "").split(",")
+      if (event.name === "openwindow" && parts[2] === "org.omarchy.screensaver") root.setSaverWindow(parts[0], true)
+      else if (event.name === "closewindow" && root.saverWindows[parts[0]]) root.setSaverWindow(parts[0], false)
+    }
+  }
+
   function startShutdown(minutes) {
     runShutdown(["start", String(Math.max(1, Math.min(Settings.MAX_MINUTES, Math.floor(minutes)))), root.lang])
   }
@@ -183,6 +213,8 @@ Item {
 
   Component.onCompleted: {
     runShutdown(["check"])
+    // A shell restart while dimmed loses track of the screensaver windows.
+    runDim(["check"])
     checkHypridle()
   }
 

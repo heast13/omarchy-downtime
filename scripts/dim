@@ -1,0 +1,78 @@
+#!/bin/bash
+# Downtime: dims every display while the screensaver runs and restores it after.
+#
+# Usage: dim down <percent> | dim up | dim check
+#
+# "down" saves each display's brightness and lowers it to <percent> (displays
+# already at or below that are left alone). "up" restores the saved values.
+# "check" restores only when no screensaver is running, for a shell restart
+# that happened while the screen was dimmed.
+set -u
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/downtime"
+SAVED="$STATE_DIR/dim-saved"
+
+usage() {
+  echo "usage: dim down <percent> | dim up | dim check" >&2
+  exit 2
+}
+
+monitors() { hyprctl monitors -j 2>/dev/null | jq -r '.[].name'; }
+brightness() { omarchy-brightness-display --monitor "$1" 2>/dev/null; }
+set_brightness() { omarchy-brightness-display --no-osd --monitor "$1" "$2%" >/dev/null 2>&1; }
+saver_running() { pgrep -f '[o]rg.omarchy.screensaver' >/dev/null; }
+
+down() {
+  local target=$1 monitor current
+  # Already dimmed: saving again would store the dimmed value.
+  [[ -s $SAVED ]] && return 0
+  mkdir -p "$STATE_DIR"
+  : >"$SAVED"
+  for monitor in $(monitors); do
+    current=$(brightness "$monitor") || continue
+    [[ $current =~ ^[0-9]+$ ]] && (( current > target )) || continue
+    set_brightness "$monitor" "$target" && echo "$monitor $current" >>"$SAVED"
+  done
+  [[ -s $SAVED ]] || rm -f "$SAVED"
+}
+
+# The display may still be waking up from screen off (or the machine from
+# sleep), when DDC does not answer yet, so keep trying for a while.
+up() {
+  local monitor value pending
+  [[ -f $SAVED ]] || return 0
+  for _ in {1..45}; do
+    pending=""
+    while read -r monitor value; do
+      [[ -n $monitor && $value =~ ^[0-9]+$ ]] || continue
+      set_brightness "$monitor" "$value" || pending+="$monitor $value"$'\n'
+    done <"$SAVED"
+    if [[ -z $pending ]]; then
+      rm -f "$SAVED"
+      return 0
+    fi
+    printf '%s' "$pending" >"$SAVED"
+    sleep 2
+  done
+  return 1
+}
+
+# Never let two runs interleave, or a restore races a new dim.
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/downtime-dim.lock"
+flock 9
+
+case "${1:-}" in
+down)
+  (( $# == 2 )) && [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 >= 1 && 10#$2 < 100 )) || usage
+  down $(( 10#$2 ))
+  ;;
+up)
+  (( $# == 1 )) || usage
+  up
+  ;;
+check)
+  (( $# == 1 )) || usage
+  saver_running || up
+  ;;
+*) usage ;;
+esac

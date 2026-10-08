@@ -23,6 +23,7 @@ Panel {
     service ? !service.systemSaverOff : true) !== false
   readonly property int screensaverMinutes: intSetting("screensaverMinutes",
     service ? Math.max(1, Math.round(service.systemSaverSeconds / 60)) : 5, 1)
+  readonly property int dimPercent: Math.min(100, intSetting("screensaverDimPercent", 100, 1))
   readonly property bool screenOffEnabled: Settings.enabled(settings, "screenOff")
   readonly property int screenOffMinutes: Settings.minutes(settings, "screenOff")
   readonly property bool suspendEnabled: Settings.enabled(settings, "suspend")
@@ -276,6 +277,19 @@ Panel {
           to: Settings.MAX_MINUTES
           value: root.screensaverMinutes
           onModified: function(v) { root.persist({ screensaverMinutes: v }) }
+        }
+
+        NumberField {
+          width: parent.width
+          visible: root.screensaverEnabled
+          label: root.tr("dimTo")
+          fieldWidth: width
+          foreground: root.fg
+          fontFamily: root.fontFamily
+          from: 1
+          to: 100
+          value: root.dimPercent
+          onModified: function(v) { root.persist({ screensaverDimPercent: v }) }
         }
 
         // ---------- Screen off ----------

@@ -14,7 +14,7 @@
     "displayName": "Downtime",
     "description": "Screensaver, screen off, sleep, shutdown timer and wallpaper rotation",
     "category": "System",
-    "aliases": ["downtime", "away", "snooze", "shutdown", "timer", "poweroff", "sleep", "suspend", "idle", "screensaver", "screen off", "dpms", "wallpaper"],
+    "aliases": ["downtime", "away", "snooze", "shutdown", "timer", "poweroff", "sleep", "suspend", "idle", "screensaver", "screen off", "dpms", "wallpaper", "dim", "brightness"],
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
@@ -32,6 +32,7 @@
       { "key": "wallpaperMinutes", "type": "number", "label": "Rotate every (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
       { "key": "screensaverEnabled", "type": "boolean", "label": "Screensaver", "defaultValue": true },
       { "key": "screensaverMinutes", "type": "number", "label": "Screensaver after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 5 },
+      { "key": "screensaverDimPercent", "type": "number", "label": "Dim screen during screensaver to (%), 100 = off", "min": 1, "max": 100, "step": 1, "defaultValue": 100 },
       { "key": "screenOffEnabled", "type": "boolean", "label": "Screen off", "defaultValue": true },
       { "key": "screenOffMinutes", "type": "number", "label": "Screen off after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
       { "key": "suspendEnabled", "type": "boolean", "label": "Sleep", "defaultValue": false },
