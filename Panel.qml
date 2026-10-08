@@ -290,8 +290,12 @@ Panel {
         // ---------- Sleep ----------
         PanelSeparator { foreground: root.fg }
 
+        // Sleep is paused while the shutdown timer runs, so it is greyed out
+        // and locked until the timer ends or is cancelled.
         SwitchHeader {
           text: root.tr("sleep")
+          enabled: !root.shutdownActive
+          opacity: enabled ? 1 : 0.4
           checked: root.suspendEnabled
           onToggled: root.persistTiming("suspend", !root.suspendEnabled, root.suspendMinutes)
         }
@@ -299,6 +303,8 @@ Panel {
         NumberField {
           width: parent.width
           visible: root.suspendEnabled
+          enabled: !root.shutdownActive
+          opacity: enabled ? 1 : 0.4
           label: root.tr("sleepAfter")
           fieldWidth: width
           foreground: root.fg
@@ -311,6 +317,7 @@ Panel {
 
         Text {
           width: parent.width
+          opacity: root.shutdownActive ? 0.4 : 1
           text: root.tr("sleepNote")
           wrapMode: Text.WordWrap
           color: Qt.darker(root.fg, 1.4)
