@@ -105,7 +105,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: String.fromCodePoint(0xF04B2)
+    text: String.fromCodePoint(0xF0904)
     tooltipText: root.wallpaperEnabled
       ? root.tr("tooltipRotate", root.wallpaperMinutes)
       : root.tr("tooltipManual")
@@ -146,7 +146,7 @@ Panel {
           Text {
             id: heroIcon
             textFormat: Text.PlainText
-            text: String.fromCodePoint(0xF04B2)
+            text: String.fromCodePoint(0xF0904)
             color: root.fg
             font.family: root.fontFamily
             font.pixelSize: Style.font.display
