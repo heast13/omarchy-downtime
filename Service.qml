@@ -192,8 +192,18 @@ Item {
       var parts = String(event.data || "").split(",")
       if (event.name === "openwindow" && parts[2] === "org.omarchy.screensaver") root.setSaverWindow(parts[0], true)
       else if (event.name === "closewindow" && root.saverWindows[parts[0]]) root.setSaverWindow(parts[0], false)
+      // A screensaver that was already open when the shell (re)started is not
+      // known here, so its close goes unnoticed. Check for saved brightness
+      // shortly after any close instead of waiting for the next tick.
+      else if (event.name === "closewindow" && Object.keys(root.saverWindows).length === 0) dimCheckDelay.restart()
       else if (/^monitor(added|removed)/.test(event.name)) dimProbeDelay.restart()
     }
+  }
+
+  Timer {
+    id: dimCheckDelay
+    interval: 1500
+    onTriggered: dimSavedFile.reload()
   }
 
   function startShutdown(minutes) {
