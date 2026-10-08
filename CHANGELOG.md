@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.0 - 2026-10-08
+
+- Dim during screensaver: lowers every display to a set brightness (default
+  40 %) while the screensaver runs and restores it afterwards. Works wherever
+  Omarchy's brightness keys work (backlight, DDC/CI). Greyed out with a hint
+  when no display can be dimmed. Every change is read back, displays waking
+  up from screen off are waited for, and a safety net restores anything left
+  dimmed.
+- Disabling the plugin restores dimmed displays.
+- A shell restart no longer risks stopping screen off, sleep or a running
+  shutdown timer when the new shell is slow to answer.
+- Shutdown timer: a quick cancel is never lost, parallel starts no longer
+  clash, a timer stopped from outside unpauses sleep, and the time left is
+  right from the first moment.
+- Script arguments with too many digits are refused instead of wrapping
+  around.
+
 ## 1.3.0 - 2026-10-08
 
 - One-shot shutdown timer, entered in hours and minutes. It confirms the time,
