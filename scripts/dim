@@ -4,7 +4,7 @@
 # Usage: dim down <percent> | dim up | dim check | dim probe
 #
 # down   saves each display's brightness and lowers it to <percent> (displays
-#        already at or below that are left alone).
+#        already at or below that, or still saved, are left alone).
 # up     restores the saved values, retrying while displays wake up.
 # check  restores only when no screensaver is running. The service calls it
 #        as a safety net whenever saved values are left behind.
@@ -50,19 +50,20 @@ set_brightness() {
 }
 
 down() {
-  local target=$1 monitor current
-  # Already dimmed: saving again would store the dimmed value.
-  [[ -s $SAVED ]] && return 0
+  local target=$1 monitor current saved
+  # Displays still saved are dimmed already (or unplugged and waiting for
+  # their restore). Saving them again would store the dimmed value, but the
+  # others are dimmed as usual.
+  saved=" $( [[ -f $SAVED ]] && awk '{ print $1 }' "$SAVED" | tr '\n' ' ')"
   mkdir -p "$STATE_DIR"
-  : >"$SAVED"
   for monitor in $(monitors); do
+    [[ $saved == *" $monitor "* ]] && continue
     current=$(brightness "$monitor") || continue
     (( current > target )) || continue
     # Saved before writing, so even a half-applied change gets restored.
     echo "$monitor $current" >>"$SAVED"
     set_brightness "$monitor" "$target"
   done
-  [[ -s $SAVED ]] || rm -f "$SAVED"
 }
 
 # Restores every saved display until all are done or the time is up. A
