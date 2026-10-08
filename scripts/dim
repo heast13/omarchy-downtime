@@ -33,7 +33,7 @@ saver_running() { pgrep -f '[o]rg.omarchy.screensaver' >/dev/null; }
 brightness() {
   local value
   value=$(omarchy-brightness-display --monitor "$1" 2>/dev/null) || return 1
-  [[ $value =~ ^[0-9]+$ ]] || return 1
+  [[ $value =~ ^[0-9]{1,3}$ ]] || return 1
   echo "$value"
 }
 
@@ -78,7 +78,7 @@ up() {
     left=""
     waiting=0
     while read -r monitor value; do
-      [[ -n $monitor && $value =~ ^[0-9]+$ ]] || continue
+      [[ -n $monitor && $value =~ ^[0-9]{1,3}$ ]] || continue
       if [[ $lit == *" $monitor "* ]]; then
         set_brightness "$monitor" "$value" && continue
         waiting=1
@@ -114,7 +114,7 @@ exec 9>"$LOCK"
 
 case "${1:-}" in
 down)
-  (( $# == 2 )) && [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 >= 1 && 10#$2 <= 99 )) || usage
+  (( $# == 2 )) && [[ $2 =~ ^[0-9]{1,2}$ ]] && (( 10#$2 >= 1 && 10#$2 <= 99 )) || usage
   # Never let two runs interleave, or a restore races a new dim.
   flock 9
   down $(( 10#$2 ))

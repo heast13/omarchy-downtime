@@ -50,7 +50,8 @@ notify() {
 case ${1:-} in
   start)
     (( $# == 2 || $# == 3 )) || usage
-    [[ $2 =~ ^[0-9]+$ ]] && (( 10#$2 >= 1 && 10#$2 <= MAX_MIN )) || usage
+    # At most four digits: longer numbers would wrap around in bash arithmetic.
+    [[ $2 =~ ^[0-9]{1,4}$ ]] && (( 10#$2 >= 1 && 10#$2 <= MAX_MIN )) || usage
     minutes=$(( 10#$2 ))
     lang=$(lang_arg "${3:-}") || exit 2
 

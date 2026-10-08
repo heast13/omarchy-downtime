@@ -27,8 +27,9 @@ SAVER_MIN=$2
 [[ $SAVER_STATE == on || $SAVER_STATE == off || $SAVER_STATE == keep ]] || usage
 minutes=("$3" "$4")
 [[ $SAVER_MIN == keep ]] || minutes+=("$SAVER_MIN")
+# At most four digits: longer numbers would wrap around in bash arithmetic.
 for value in "${minutes[@]}"; do
-  [[ $value =~ ^[0-9]+$ ]] && (( 10#$value <= MAX_MIN )) || usage
+  [[ $value =~ ^[0-9]{1,4}$ ]] && (( 10#$value <= MAX_MIN )) || usage
 done
 if [[ $SAVER_MIN != keep ]]; then
   SAVER=$(( 10#$SAVER_MIN * 60 ))
