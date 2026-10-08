@@ -39,8 +39,8 @@ Item {
   readonly property int screensaverMinutes: Math.min(Settings.MAX_MINUTES, Math.max(1, num("screensaverMinutes", 5)))
   readonly property int screenOffMinutes: Settings.effectiveMinutes(settings, "screenOff")
   readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend")
-  // Brightness while the screensaver runs; 100 leaves the displays alone.
-  readonly property int dimPercent: Math.min(100, Math.max(1, num("screensaverDimPercent", 100)))
+  readonly property bool dimEnabled: Settings.dimEnabled(settings)
+  readonly property int dimPercent: Settings.dimPercent(settings)
   readonly property string lang: I18n.language(settings ? settings.language : "auto", Qt.locale().name)
 
   // One-shot shutdown timer. The deadline (epoch seconds) comes from the state
@@ -145,7 +145,7 @@ Item {
     var before = Object.keys(saverWindows).length
     var after = Object.keys(next).length
     saverWindows = next
-    if (before === 0 && after > 0 && dimPercent < 100) runDim(["down", String(dimPercent)])
+    if (before === 0 && after > 0 && dimEnabled) runDim(["down", String(dimPercent)])
     else if (before > 0 && after === 0) runDim(["up"])
   }
 

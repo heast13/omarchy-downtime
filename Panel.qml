@@ -23,7 +23,8 @@ Panel {
     service ? !service.systemSaverOff : true) !== false
   readonly property int screensaverMinutes: intSetting("screensaverMinutes",
     service ? Math.max(1, Math.round(service.systemSaverSeconds / 60)) : 5, 1)
-  readonly property int dimPercent: Math.min(100, intSetting("screensaverDimPercent", 100, 1))
+  readonly property bool dimEnabled: Settings.dimEnabled(settings)
+  readonly property int dimPercent: Settings.dimPercent(settings)
   readonly property bool screenOffEnabled: Settings.enabled(settings, "screenOff")
   readonly property int screenOffMinutes: Settings.minutes(settings, "screenOff")
   readonly property bool suspendEnabled: Settings.enabled(settings, "suspend")
@@ -279,17 +280,31 @@ Panel {
           onModified: function(v) { root.persist({ screensaverMinutes: v }) }
         }
 
+        // ---------- Dim ----------
+        PanelSeparator { foreground: root.fg }
+
+        // Dimming follows the screensaver, so it is greyed out while that is off.
+        SwitchHeader {
+          text: root.tr("dim")
+          enabled: root.screensaverEnabled
+          opacity: enabled ? 1 : 0.4
+          checked: root.dimEnabled
+          onToggled: root.persist({ screensaverDimEnabled: !root.dimEnabled, screensaverDimPercent: root.dimPercent })
+        }
+
         NumberField {
           width: parent.width
-          visible: root.screensaverEnabled
+          visible: root.dimEnabled
+          enabled: root.screensaverEnabled
+          opacity: enabled ? 1 : 0.4
           label: root.tr("dimTo")
           fieldWidth: width
           foreground: root.fg
           fontFamily: root.fontFamily
           from: 1
-          to: 100
+          to: 99
           value: root.dimPercent
-          onModified: function(v) { root.persist({ screensaverDimPercent: v }) }
+          onModified: function(v) { root.persist({ screensaverDimEnabled: true, screensaverDimPercent: v }) }
         }
 
         // ---------- Screen off ----------

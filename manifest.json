@@ -20,6 +20,8 @@
     "defaults": {
       "wallpaperEnabled": false,
       "wallpaperMinutes": 10,
+      "screensaverDimEnabled": false,
+      "screensaverDimPercent": 40,
       "screenOffEnabled": true,
       "screenOffMinutes": 10,
       "suspendEnabled": false,
@@ -32,7 +34,8 @@
       { "key": "wallpaperMinutes", "type": "number", "label": "Rotate every (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
       { "key": "screensaverEnabled", "type": "boolean", "label": "Screensaver", "defaultValue": true },
       { "key": "screensaverMinutes", "type": "number", "label": "Screensaver after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 5 },
-      { "key": "screensaverDimPercent", "type": "number", "label": "Dim screen during screensaver to (%), 100 = off", "min": 1, "max": 100, "step": 1, "defaultValue": 100 },
+      { "key": "screensaverDimEnabled", "type": "boolean", "label": "Dim during screensaver", "defaultValue": false },
+      { "key": "screensaverDimPercent", "type": "number", "label": "Dim to (%)", "min": 1, "max": 99, "step": 1, "defaultValue": 40 },
       { "key": "screenOffEnabled", "type": "boolean", "label": "Screen off", "defaultValue": true },
       { "key": "screenOffMinutes", "type": "number", "label": "Screen off after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
       { "key": "suspendEnabled", "type": "boolean", "label": "Sleep", "defaultValue": false },

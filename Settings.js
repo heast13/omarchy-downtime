@@ -30,6 +30,18 @@ function enabled(settings, name) {
   return stored < 0 ? t.on : stored > 0
 }
 
+// Dimming while the screensaver runs: a switch plus a brightness in percent.
+var DIM_FALLBACK = 40
+
+function dimEnabled(settings) {
+  return !!settings && settings.screensaverDimEnabled === true
+}
+
+function dimPercent(settings) {
+  var v = Math.floor(Number(settings ? settings.screensaverDimPercent : undefined))
+  return isFinite(v) && v >= 1 && v <= 99 ? v : DIM_FALLBACK
+}
+
 // Minutes shown in the field and used while the switch is on (never 0).
 function minutes(settings, name) {
   var stored = storedMinutes(settings, timings[name].minutes)
