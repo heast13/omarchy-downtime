@@ -46,18 +46,19 @@ Item {
   readonly property bool shutdownActive: shutdownDeadline > now
   readonly property int shutdownMinutesLeft: shutdownActive ? Math.ceil((shutdownDeadline - now) / 60) : 0
 
-  // The screensaver is Omarchy's own setting. Leave it alone until the user
-  // changes it in this widget, so enabling the plugin overwrites nothing.
-  readonly property bool screensaverManaged: !!settings
-    && (settings.screensaverEnabled !== undefined || settings.screensaverMinutes !== undefined)
+  // The screensaver is Omarchy's own setting. Its on/off toggle and its delay
+  // are each left alone ("keep") until the user changes that part here, so
+  // enabling the plugin or flipping the switch never rounds the delay.
+  readonly property bool saverStateSet: !!settings && settings.screensaverEnabled !== undefined
+  readonly property bool saverMinutesSet: !!settings && settings.screensaverMinutes !== undefined
   readonly property int systemSaverSeconds: {
     var v = Number(idleConfig ? idleConfig.screensaver : undefined)
     return isFinite(v) && v > 0 ? Math.floor(v) : 150
   }
 
   readonly property var applyArgs: [
-    screensaverManaged ? (screensaverEnabled ? "on" : "off") : "keep",
-    screensaverManaged ? String(screensaverMinutes) : "keep",
+    saverStateSet ? (screensaverEnabled ? "on" : "off") : "keep",
+    saverMinutesSet ? String(screensaverMinutes) : "keep",
     String(screenOffMinutes),
     // Sleep would stop the shutdown timer from ever firing, so it pauses.
     String(shutdownActive ? 0 : suspendMinutes)
@@ -155,10 +156,35 @@ Item {
     onTriggered: {
       root.now = Date.now() / 1000
       shutdownFile.reload()
+      if (root.hypridleMissing) root.checkHypridle()
     }
   }
 
-  Component.onCompleted: runShutdown(["check"])
+  // Screen off and sleep need hypridle. The widget warns while it is missing,
+  // and once it appears the timings are applied again so it starts.
+  property bool hypridleMissing: false
+
+  function checkHypridle() {
+    if (!hypridleCheck.running) hypridleCheck.running = true
+  }
+
+  Process {
+    id: hypridleCheck
+    command: ["sh", "-c", "command -v hypridle"]
+    onExited: function(code) {
+      var missing = code !== 0
+      if (root.hypridleMissing && !missing) {
+        root.appliedKey = ""
+        root.scheduleApply()
+      }
+      root.hypridleMissing = missing
+    }
+  }
+
+  Component.onCompleted: {
+    runShutdown(["check"])
+    checkHypridle()
+  }
 
   Timer {
     id: wallpaperTimer

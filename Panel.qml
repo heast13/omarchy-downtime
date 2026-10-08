@@ -68,10 +68,6 @@ Panel {
     root.persist(values)
   }
 
-  function persistScreensaver(on, minutes) {
-    root.persist({ screensaverEnabled: on, screensaverMinutes: minutes })
-  }
-
   function persistShutdown(hours, minutes) {
     var total = Math.max(1, Math.min(Settings.MAX_MINUTES, hours * 60 + minutes))
     root.persist({ shutdownMinutes: total })
@@ -209,6 +205,18 @@ Panel {
           }
         }
 
+        // Screen off and sleep need hypridle; say so instead of silently failing.
+        Text {
+          width: parent.width
+          visible: !!root.service && root.service.hypridleMissing
+            && (root.screenOffEnabled || root.suspendEnabled)
+          text: root.tr("hypridleMissing")
+          wrapMode: Text.WordWrap
+          color: Color.urgent
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+
         // ---------- Wallpaper ----------
         PanelSeparator { foreground: root.fg }
 
@@ -254,7 +262,7 @@ Panel {
         SwitchHeader {
           text: root.tr("screensaver")
           checked: root.screensaverEnabled
-          onToggled: root.persistScreensaver(!root.screensaverEnabled, root.screensaverMinutes)
+          onToggled: root.persist({ screensaverEnabled: !root.screensaverEnabled })
         }
 
         NumberField {
@@ -267,7 +275,7 @@ Panel {
           from: 1
           to: Settings.MAX_MINUTES
           value: root.screensaverMinutes
-          onModified: function(v) { root.persistScreensaver(true, v) }
+          onModified: function(v) { root.persist({ screensaverMinutes: v }) }
         }
 
         // ---------- Screen off ----------

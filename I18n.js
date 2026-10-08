@@ -30,7 +30,8 @@ var strings = {
     timeLeft: "%1 left",
     shutdownHero: "Shutdown %1",
     sleepPaused: "Paused while the shutdown timer runs.",
-    tooltipShutdown: "Shutting down at %1"
+    tooltipShutdown: "Shutting down at %1",
+    hypridleMissing: "hypridle is not installed, so screen off and sleep do nothing. Install it with:\nomarchy pkg add hypridle"
   },
   de: {
     title: "Downtime",
@@ -59,7 +60,8 @@ var strings = {
     timeLeft: "noch %1",
     shutdownHero: "Ausschalten %1",
     sleepPaused: "Pausiert, solange der Ausschalt-Timer läuft.",
-    tooltipShutdown: "Fährt um %1 herunter"
+    tooltipShutdown: "Fährt um %1 herunter",
+    hypridleMissing: "hypridle ist nicht installiert, darum tun Bildschirm aus und Energiesparmodus nichts. Installieren mit:\nomarchy pkg add hypridle"
   }
 }
 

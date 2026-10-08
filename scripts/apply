@@ -4,7 +4,8 @@
 #
 # Usage: apply <on|off|keep> <screensaver-minutes|keep> <screen-off-minutes> <sleep-minutes>
 #
-# "keep keep" leaves Omarchy's screensaver settings exactly as they are.
+# "keep" leaves that part of Omarchy's screensaver (its on/off toggle or its
+# delay) exactly as it is, so only what the user changed in the widget is written.
 set -u
 
 SHELL_JSON="$HOME/.config/omarchy/shell.json"
@@ -22,16 +23,15 @@ usage() {
 # lock the session on the spot (see below).
 (( $# == 4 )) || usage
 SAVER_STATE=$1
-case $SAVER_STATE in
-  on | off) minutes=("$2" "$3" "$4") ;;
-  keep) [[ $2 == keep ]] || usage; minutes=("$3" "$4") ;;
-  *) usage ;;
-esac
+SAVER_MIN=$2
+[[ $SAVER_STATE == on || $SAVER_STATE == off || $SAVER_STATE == keep ]] || usage
+minutes=("$3" "$4")
+[[ $SAVER_MIN == keep ]] || minutes+=("$SAVER_MIN")
 for value in "${minutes[@]}"; do
   [[ $value =~ ^[0-9]+$ ]] && (( 10#$value <= MAX_MIN )) || usage
 done
-if [[ $SAVER_STATE != keep ]]; then
-  SAVER=$(( 10#$2 * 60 ))
+if [[ $SAVER_MIN != keep ]]; then
+  SAVER=$(( 10#$SAVER_MIN * 60 ))
   (( SAVER >= 60 )) || SAVER=60
 fi
 OFF_MIN=$(( 10#$3 ))
@@ -43,18 +43,19 @@ flock 9
 
 # ---------- screensaver (Omarchy's own idle service) ----------
 
-# Untouched until the user sets it in the widget.
-if [[ $SAVER_STATE != keep ]]; then
-  # "Off" uses Omarchy's own screensaver toggle (the same one as in its menu) and
-  # keeps idle.screensaver a real delay. Writing a huge "never" value instead
-  # breaks Omarchy's idle timer: when it is as large as idle.lock, the shell locks
-  # the session the moment its idle monitor restarts.
-  if [[ $SAVER_STATE == off ]]; then
-    omarchy-toggle screensaver-off on
-  else
-    omarchy-toggle screensaver-off off
-  fi
+# Both parts stay untouched until the user sets them in the widget.
 
+# "Off" uses Omarchy's own screensaver toggle (the same one as in its menu) and
+# keeps idle.screensaver a real delay. Writing a huge "never" value instead
+# breaks Omarchy's idle timer: when it is as large as idle.lock, the shell locks
+# the session the moment its idle monitor restarts.
+if [[ $SAVER_STATE == off ]]; then
+  omarchy-toggle screensaver-off on
+elif [[ $SAVER_STATE == on ]]; then
+  omarchy-toggle screensaver-off off
+fi
+
+if [[ $SAVER_MIN != keep ]]; then
   file_saver() { jq -r '.idle.screensaver // empty' "$SHELL_JSON" 2>/dev/null; }
   shell_status() { omarchy-shell idle status 2>/dev/null | jq -r ".$1 // empty" 2>/dev/null; }
 
