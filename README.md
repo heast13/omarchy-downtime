@@ -12,12 +12,14 @@ An independent [MIT](LICENSE)-licensed plugin. Not affiliated with or endorsed b
 
 ## What it does
 
+Each setting has a small on/off switch next to its title. The minutes are kept while it is off.
+
 | Setting | Default | Notes |
 | --- | --- | --- |
-| Wallpaper rotation | off | Calls `omarchy-theme-bg-next`. Right-click the widget for the next one. |
+| Wallpaper rotation | off, 10 min | Calls `omarchy-theme-bg-next`. Right-click the widget for the next one. |
 | Screensaver | unchanged | Omarchy's own `idle.screensaver` and screensaver toggle. Left exactly as they are until you change them in the widget. |
 | Screen off | 10 min | Via hypridle. |
-| Sleep | off | Via hypridle and `systemctl suspend`. |
+| Sleep | off, 30 min | Via hypridle and `systemctl suspend`. |
 
 Things worth knowing:
 

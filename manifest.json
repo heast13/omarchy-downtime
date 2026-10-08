@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "heast13.downtime",
   "name": "Downtime",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "heast13",
   "description": "Screensaver, screen-off, sleep and wallpaper rotation timings in one bar widget.",
   "kinds": ["service", "bar-widget"],
@@ -18,17 +18,23 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "wallpaperMinutes": 0,
+      "wallpaperEnabled": false,
+      "wallpaperMinutes": 10,
+      "screenOffEnabled": true,
       "screenOffMinutes": 10,
-      "suspendMinutes": 0,
+      "suspendEnabled": false,
+      "suspendMinutes": 30,
       "language": "auto"
     },
     "schema": [
-      { "key": "wallpaperMinutes", "type": "number", "label": "Wallpaper rotation (minutes, 0 = off)", "min": 0, "max": 1440, "step": 1, "defaultValue": 0 },
+      { "key": "wallpaperEnabled", "type": "boolean", "label": "Wallpaper rotation", "defaultValue": false },
+      { "key": "wallpaperMinutes", "type": "number", "label": "Rotate every (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
       { "key": "screensaverEnabled", "type": "boolean", "label": "Screensaver", "defaultValue": true },
       { "key": "screensaverMinutes", "type": "number", "label": "Screensaver after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 5 },
-      { "key": "screenOffMinutes", "type": "number", "label": "Screen off after (minutes, 0 = never)", "min": 0, "max": 1440, "step": 1, "defaultValue": 10 },
-      { "key": "suspendMinutes", "type": "number", "label": "Sleep after (minutes, 0 = never)", "min": 0, "max": 1440, "step": 1, "defaultValue": 0 }
+      { "key": "screenOffEnabled", "type": "boolean", "label": "Screen off", "defaultValue": true },
+      { "key": "screenOffMinutes", "type": "number", "label": "Screen off after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
+      { "key": "suspendEnabled", "type": "boolean", "label": "Sleep", "defaultValue": false },
+      { "key": "suspendMinutes", "type": "number", "label": "Sleep after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 30 }
     ]
   }
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 - 2026-10-08
+
+- Every section has the same small on/off switch next to its title. The
+  minutes are kept while a switch is off. Settings from earlier versions,
+  where 0 minutes meant off, carry over.
+- New moon icon.
+
 ## 1.1.0 - 2026-10-08
 
 - Enabling the plugin no longer changes the screensaver. Omarchy's screensaver
