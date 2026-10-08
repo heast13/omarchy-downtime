@@ -39,7 +39,7 @@ var strings = {
     on: "An",
     offLower: "Aus",
     min: "MIN",
-    sleepIn: "Schlafen",
+    sleepIn: "Energiesparmodus",
     tooltipRotate: "Wallpaper alle %1 Min · Rechtsklick: weiter",
     tooltipManual: "Downtime · Rechtsklick: nächstes Wallpaper"
   }
