@@ -47,6 +47,13 @@ notify() {
   omarchy-notification-send -g 󰐥 "Downtime" "$1" >/dev/null 2>&1 || true
 }
 
+# Never let two runs interleave, or the deadline file and the running timer
+# can disagree.
+serialize() {
+  exec 9>"${XDG_RUNTIME_DIR:-/tmp}/downtime-shutdown.lock"
+  flock 9
+}
+
 case ${1:-} in
   start)
     (( $# == 2 || $# == 3 )) || usage
@@ -54,6 +61,7 @@ case ${1:-} in
     [[ $2 =~ ^[0-9]{1,4}$ ]] && (( 10#$2 >= 1 && 10#$2 <= MAX_MIN )) || usage
     minutes=$(( 10#$2 ))
     lang=$(lang_arg "${3:-}") || exit 2
+    serialize
 
     stop_units
     deadline=$(( $(date +%s) + minutes * 60 ))
@@ -73,6 +81,7 @@ case ${1:-} in
   cancel)
     (( $# == 1 || $# == 2 )) || usage
     lang=$(lang_arg "${2:-}") || exit 2
+    serialize
     stop_units
     if [[ -f $DEADLINE_FILE ]]; then
       rm -f "$DEADLINE_FILE"
@@ -81,6 +90,7 @@ case ${1:-} in
     ;;
   check)
     (( $# == 1 )) || usage
+    serialize
     # After a reboot or a manual stop the file outlives its timer.
     if [[ -f $DEADLINE_FILE ]] && ! systemctl --user is-active --quiet "$UNIT.timer"; then
       rm -f "$DEADLINE_FILE"
