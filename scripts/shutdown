@@ -59,7 +59,7 @@ case ${1:-} in
     deadline=$(( $(date +%s) + minutes * 60 ))
     systemd-run --user --quiet --collect --unit="$UNIT" \
       --on-active="${minutes}min" --timer-property=AccuracySec=1s \
-      systemctl poweroff || exit 1
+      systemctl poweroff || { rm -f "$DEADLINE_FILE"; exit 1; }
     if (( minutes >= 2 )); then
       systemd-run --user --quiet --collect --unit="$WARN_UNIT" \
         --on-active="$(( minutes - 1 ))min" --timer-property=AccuracySec=1s \

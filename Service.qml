@@ -201,8 +201,15 @@ Item {
 
   function cancelShutdown() { runShutdown(["cancel", root.lang]) }
 
+  // A request made while the script still runs (a quick second click) is
+  // run next instead of being dropped; only the latest one counts.
+  property var pendingShutdown: null
+
   function runShutdown(args) {
-    if (shutdownProc.running) return
+    if (shutdownProc.running) {
+      pendingShutdown = args
+      return
+    }
     shutdownProc.command = [root.shutdownScript].concat(args)
     shutdownProc.running = true
   }
@@ -210,7 +217,13 @@ Item {
   // A newly created file is not watched yet, so reload once the script is done.
   Process {
     id: shutdownProc
-    onExited: shutdownFile.reload()
+    onExited: {
+      shutdownFile.reload()
+      if (!root.pendingShutdown) return
+      var args = root.pendingShutdown
+      root.pendingShutdown = null
+      Qt.callLater(root.runShutdown, args)
+    }
   }
 
   // Keeps the countdown current and notices a timer that ended elsewhere.
@@ -221,6 +234,8 @@ Item {
     onTriggered: {
       root.now = Date.now() / 1000
       shutdownFile.reload()
+      // A timer stopped outside the widget leaves its deadline file behind.
+      if (root.shutdownActive && !shutdownProc.running && !root.pendingShutdown) root.runShutdown(["check"])
       dimSavedFile.reload()
       if (root.hypridleMissing) root.checkHypridle()
     }
