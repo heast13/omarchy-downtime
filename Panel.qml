@@ -72,6 +72,11 @@ Panel {
     root.persist({ screensaverEnabled: on, screensaverMinutes: minutes })
   }
 
+  function persistShutdown(hours, minutes) {
+    var total = Math.max(1, Math.min(Settings.MAX_MINUTES, hours * 60 + minutes))
+    root.persist({ shutdownMinutes: total })
+  }
+
   function nextWallpaper() { Quickshell.execDetached(["omarchy-theme-bg-next"]) }
 
   implicitWidth: button.implicitWidth
@@ -349,17 +354,38 @@ Panel {
           }
         }
 
-        NumberField {
+        // Hours and minutes side by side; stored as total minutes (1 to 24 h).
+        Row {
+          id: shutdownFields
           width: parent.width
           visible: !root.shutdownActive
-          label: root.tr("shutdownAfter")
-          fieldWidth: width
-          foreground: root.fg
-          fontFamily: root.fontFamily
-          from: 1
-          to: Settings.MAX_MINUTES
-          value: root.shutdownMinutes
-          onModified: function(v) { root.persist({ shutdownMinutes: v }) }
+          spacing: Style.space(10)
+
+          readonly property real fieldWidth: (width - spacing) / 2
+
+          NumberField {
+            width: shutdownFields.fieldWidth
+            label: root.tr("hours")
+            fieldWidth: width
+            foreground: root.fg
+            fontFamily: root.fontFamily
+            from: 0
+            to: Settings.MAX_MINUTES / 60
+            value: Math.floor(root.shutdownMinutes / 60)
+            onModified: function(v) { root.persistShutdown(v, root.shutdownMinutes % 60) }
+          }
+
+          NumberField {
+            width: shutdownFields.fieldWidth
+            label: root.tr("minutes")
+            fieldWidth: width
+            foreground: root.fg
+            fontFamily: root.fontFamily
+            from: 0
+            to: 59
+            value: root.shutdownMinutes % 60
+            onModified: function(v) { root.persistShutdown(Math.floor(root.shutdownMinutes / 60), v) }
+          }
         }
 
         Column {
