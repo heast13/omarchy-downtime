@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "heast13.downtime",
+  "name": "Downtime",
+  "version": "1.0.0",
+  "author": "heast13",
+  "description": "Screensaver, screen-off, sleep and wallpaper rotation timings in one bar widget.",
+  "kinds": ["service", "bar-widget"],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Downtime",
+    "description": "Screensaver, screen off, sleep and wallpaper rotation",
+    "category": "System",
+    "aliases": ["downtime", "away", "snooze", "sleep", "suspend", "idle", "screensaver", "screen off", "dpms", "wallpaper"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "wallpaperMinutes": 0,
+      "screensaverEnabled": true,
+      "screensaverMinutes": 5,
+      "screenOffMinutes": 10,
+      "suspendMinutes": 0,
+      "language": "auto"
+    },
+    "schema": [
+      { "key": "wallpaperMinutes", "type": "number", "label": "Wallpaper rotation (minutes, 0 = off)", "min": 0, "max": 1440, "step": 1, "defaultValue": 0 },
+      { "key": "screensaverEnabled", "type": "boolean", "label": "Screensaver", "defaultValue": true },
+      { "key": "screensaverMinutes", "type": "number", "label": "Screensaver after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 5 },
+      { "key": "screenOffMinutes", "type": "number", "label": "Screen off after (minutes, 0 = never)", "min": 0, "max": 1440, "step": 1, "defaultValue": 10 },
+      { "key": "suspendMinutes", "type": "number", "label": "Sleep after (minutes, 0 = never)", "min": 0, "max": 1440, "step": 1, "defaultValue": 0 }
+    ]
+  }
+}
