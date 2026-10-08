@@ -71,7 +71,7 @@ cat ~/.local/state/downtime/hypridle.conf
 
 ## Language
 
-The UI follows the system locale and falls back to English. To pick a language yourself:
+The UI follows the system locale and falls back to English. Click the **EN** / **DE** button at the top of the panel to switch. From a terminal:
 
 ```sh
 omarchy bar set heast13.downtime language de

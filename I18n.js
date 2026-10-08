@@ -21,7 +21,8 @@ var strings = {
     min: "MIN",
     sleepIn: "Sleep",
     tooltipRotate: "Wallpaper every %1 min · Right-click: next",
-    tooltipManual: "Downtime · Right-click: next wallpaper"
+    tooltipManual: "Downtime · Right-click: next wallpaper",
+    languageTooltip: "Switch to German"
   },
   de: {
     title: "Downtime",
@@ -41,7 +42,8 @@ var strings = {
     min: "MIN",
     sleepIn: "Energiesparmodus",
     tooltipRotate: "Wallpaper alle %1 Min · Rechtsklick: weiter",
-    tooltipManual: "Downtime · Rechtsklick: nächstes Wallpaper"
+    tooltipManual: "Downtime · Rechtsklick: nächstes Wallpaper",
+    languageTooltip: "Auf Englisch umstellen"
   }
 }
 

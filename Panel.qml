@@ -292,13 +292,40 @@ Panel {
           onModified: function(v) { root.persistTiming("suspend", true, v) }
         }
 
-        Text {
+        // Note on the left, the small language switch on the right.
+        Item {
           width: parent.width
-          text: root.tr("sleepNote")
-          wrapMode: Text.WordWrap
-          color: Qt.darker(root.fg, 1.4)
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          implicitHeight: Math.max(note.implicitHeight, langButton.implicitHeight)
+
+          Text {
+            id: note
+            anchors.left: parent.left
+            anchors.right: langButton.left
+            anchors.rightMargin: Style.space(10)
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.tr("sleepNote")
+            wrapMode: Text.WordWrap
+            color: Qt.darker(root.fg, 1.4)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          // Omarchy has no settings window for plugins, so the language
+          // switch lives here. A click picks the other language explicitly.
+          Button {
+            id: langButton
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            text: root.lang.toUpperCase()
+            tooltipText: root.tr("languageTooltip")
+            foreground: root.fg
+            fontFamily: root.fontFamily
+            fontSize: Style.font.caption
+            horizontalPadding: Style.space(6)
+            verticalPadding: Style.space(2)
+            bordered: true
+            onClicked: root.persist({ language: root.lang === "de" ? "en" : "de" })
+          }
         }
       }
     }
