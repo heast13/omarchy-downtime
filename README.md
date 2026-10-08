@@ -2,6 +2,10 @@
 
 Screensaver, screen off, sleep and wallpaper rotation for [Omarchy](https://omarchy.org/), set from one bar widget.
 
+<p align="center">
+  <img src="preview.png" alt="Downtime panel: wallpaper rotation, screensaver, screen off and sleep timings" width="360">
+</p>
+
 Omarchy can start a screensaver and lock on idle out of the box. Downtime adds the two steps after that: turn the screen off, then put the machine to sleep.
 
 An independent [MIT](LICENSE)-licensed plugin. Not affiliated with or endorsed by 37signals.
