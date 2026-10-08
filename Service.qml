@@ -22,6 +22,7 @@ Item {
   readonly property string shutdownScript: pluginDir + "/scripts/shutdown"
   readonly property string dimScript: pluginDir + "/scripts/dim"
   readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/downtime"
+  readonly property string configPath: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
 
   property var settings: ({})
   property var idleConfig: ({})
@@ -92,7 +93,7 @@ Item {
 
   FileView {
     id: configFile
-    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+    path: root.configPath
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
@@ -290,14 +291,21 @@ Item {
     }
   }
 
-  // A hot-reload destroys and recreates this object too, so wait and only stop
-  // hypridle and a running shutdown timer when the plugin really is disabled or
-  // removed. Inline rather than in scripts/: on removal the folder is gone.
+  // A hot-reload or shell restart destroys and recreates this object too, so
+  // wait and only clean up when the plugin really is disabled or removed: its
+  // folder is gone or shell.json no longer lists it. Read from disk, because a
+  // restarting shell may not answer yet or not have found its plugins. Then
+  // stop hypridle and a running shutdown timer and restore dimmed displays.
+  // Inline rather than in scripts/: on removal the folder is gone.
   Component.onDestruction: Quickshell.execDetached([
     "systemd-run", "--user", "--quiet", "--collect", "bash", "-c",
-    "sleep 3; omarchy plugin list --json | jq -e --arg id \"$1\" 'any(.[]; .id == $id and .enabled)' >/dev/null"
-      + " || { systemctl --user stop downtime-hypridle.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
-      + " rm -f \"$2/shutdown-at\"; }",
-    "downtime-stop", root.pluginId, root.stateDir
+    "sleep 3; [[ -f \"$3/manifest.json\" ]] && jq -e --arg id \"$1\""
+      + " '[(.bar.layout // {})[]?[]?, (.plugins // [])[]?] | any((if type == \"object\" then .id else . end) == $id)'"
+      + " \"$4\" >/dev/null 2>&1 && exit 0;"
+      + " systemctl --user stop downtime-hypridle.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
+      + " rm -f \"$2/shutdown-at\"; f=\"$2/dim-saved\"; [[ -f $f ]] || exit 0; ok=1;"
+      + " while read -r m v; do omarchy-brightness-display --no-osd --monitor \"$m\" \"$v%\" >/dev/null 2>&1 || ok=0; done <\"$f\";"
+      + " (( ok )) && rm -f \"$f\"",
+    "downtime-stop", root.pluginId, root.stateDir, root.pluginDir, root.configPath
   ])
 }
