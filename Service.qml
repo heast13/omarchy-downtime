@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Settings.js" as Settings
 
 // Headless half of Downtime. It reads its settings straight from shell.json
 // instead of waiting for the bar widget to push them, so it works the same
@@ -28,11 +29,11 @@ Item {
     return isFinite(v) && v >= 0 ? Math.floor(v) : fallback
   }
 
-  readonly property int wallpaperMinutes: num("wallpaperMinutes", 0)
+  readonly property int wallpaperMinutes: Settings.effectiveMinutes(settings, "wallpaper")
   readonly property bool screensaverEnabled: !settings || settings.screensaverEnabled !== false
-  readonly property int screensaverMinutes: Math.min(1440, Math.max(1, num("screensaverMinutes", 5)))
-  readonly property int screenOffMinutes: Math.min(1440, num("screenOffMinutes", 10))
-  readonly property int suspendMinutes: Math.min(1440, num("suspendMinutes", 0))
+  readonly property int screensaverMinutes: Math.min(Settings.MAX_MINUTES, Math.max(1, num("screensaverMinutes", 5)))
+  readonly property int screenOffMinutes: Settings.effectiveMinutes(settings, "screenOff")
+  readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend")
 
   // The screensaver is Omarchy's own setting. Leave it alone until the user
   // changes it in this widget, so enabling the plugin overwrites nothing.
