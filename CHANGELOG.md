@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.1 - 2026-10-09
+
+- Dimmed displays come back within seconds after waking from a long screen
+  off. Some monitors drop off the bus for a moment while they wake up, and
+  their first brightness request fails. Downtime now waits for such a
+  display, retries right away instead of after a minute, and restores as
+  soon as the display is back.
+
 ## 1.4.0 - 2026-10-08
 
 - Dim during screensaver: lowers every display to a set brightness (default
