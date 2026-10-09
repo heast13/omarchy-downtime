@@ -198,7 +198,12 @@ Item {
       // known here, so its close goes unnoticed. Check for saved brightness
       // shortly after any close instead of waiting for the next tick.
       else if (event.name === "closewindow" && Object.keys(root.saverWindows).length === 0) dimCheckDelay.restart()
-      else if (/^monitor(added|removed)/.test(event.name)) dimProbeDelay.restart()
+      else if (/^monitor(added|removed)/.test(event.name)) {
+        dimProbeDelay.restart()
+        // A display back from deep sleep (or plugged in again) gets its
+        // saved brightness right away instead of on the next tick.
+        if (event.name.indexOf("monitoradded") === 0) dimCheckDelay.restart()
+      }
     }
   }
 

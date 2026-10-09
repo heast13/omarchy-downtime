@@ -19,6 +19,10 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/downtime"
 SAVED="$STATE_DIR/dim-saved"
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/downtime-dim.lock"
 RESTORE_SECONDS=180
+# A display in deep sleep can drop off the bus entirely while it wakes up
+# (Hyprland shows a FALLBACK output meanwhile). It is waited for this long
+# before it counts as unplugged.
+MISSING_SECONDS=30
 
 usage() {
   echo "usage: dim down <percent> | dim up | dim check | dim probe" >&2
@@ -37,11 +41,21 @@ brightness() {
   echo "$value"
 }
 
+# omarchy-brightness-display-ddc remembers a display without DDC for a minute
+# and fails at once meanwhile. A display that just woke up often misses its
+# first DDC request, so forget that before every try.
+forget_ddc_failure() {
+  local file="${XDG_RUNTIME_DIR:-/tmp}/omarchy-brightness-display-ddc/${1//[^[:alnum:]_.-]/_}.bus" state
+  [[ -r $file ]] && read -r state _ <"$file" && [[ $state == unavailable ]] && rm -f "$file"
+  return 0
+}
+
 # Some monitors acknowledge a write they ignore (often right after waking up),
 # so read it back. DDC rounding can be one step off.
 set_brightness() {
   local monitor=$1 target=$2 now
   for _ in 1 2 3; do
+    forget_ddc_failure "$monitor"
     omarchy-brightness-display --no-osd --monitor "$monitor" "$target%" >/dev/null 2>&1
     now=$(brightness "$monitor") && (( now >= target - 1 && now <= target + 1 )) && return 0
     sleep 0.5
@@ -68,10 +82,11 @@ down() {
 
 # Restores every saved display until all are done or the time is up. A
 # display that is connected but still off (waking from screen off) is waited
-# for. One that is unplugged stays saved; the service's safety net restores
-# it once it is back.
+# for, and so is one that is missing for a short while. One that stays
+# unplugged stays saved; the service's safety net restores it once it is back.
 up() {
-  local deadline=$((SECONDS + $1)) monitor value connected lit left waiting
+  local deadline=$((SECONDS + $1)) missing_until=$((SECONDS + MISSING_SECONDS))
+  local monitor value connected lit left waiting
   [[ -f $SAVED ]] || return 0
   while :; do
     connected=" $(monitors | tr '\n' ' ')"
@@ -83,7 +98,7 @@ up() {
       if [[ $lit == *" $monitor "* ]]; then
         set_brightness "$monitor" "$value" && continue
         waiting=1
-      elif [[ $connected == *" $monitor "* ]]; then
+      elif [[ $connected == *" $monitor "* ]] || (( SECONDS < missing_until )); then
         waiting=1
       fi
       left+="$monitor $value"$'\n'
