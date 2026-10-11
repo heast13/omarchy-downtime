@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.2 - 2026-10-11
+
+- Numbers in the panel are set with − and + buttons instead of a text field.
+  Hold a button to count faster, or use the mouse wheel or the arrow keys.
+  Without a text field the panel never reads the clipboard, so a misbehaving
+  clipboard owner can no longer stall the shell or fill its memory.
+
 ## 1.4.1 - 2026-10-09
 
 - Dimmed displays come back within seconds after waking from a long screen

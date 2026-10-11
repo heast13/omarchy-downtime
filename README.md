@@ -31,6 +31,7 @@ Things worth knowing:
 - **The shutdown timer is one-shot.** The switch starts the countdown and cancels it. A notification confirms the time, and another one comes one minute before. Sleep is paused and greyed out while it runs, because a sleeping machine would never shut down. The timer survives a shell restart and is cancelled when the plugin is disabled or removed. The chosen time is kept for next time.
 - **Dimming needs a display whose brightness Omarchy can set.** It uses `omarchy-brightness-display`, the same path as the brightness keys: the backlight on laptops, DDC/CI on external monitors. If no display can be dimmed, the switch is greyed out with a hint. On a monitor, DDC/CI may have to be turned on in its own menu. If your brightness keys work, dimming works too.
 - **Brightness always comes back.** Each change is read back and retried, displays still waking up from screen off are waited for (even monitors that vanish for a moment while they wake up), and anything left dimmed without a screensaver is restored within seconds. Displays already darker than the target are left alone.
+- **Numbers are set with − and +.** Hold a button to count faster, or use the mouse wheel or the arrow keys. There is no text field, so the panel never reads the clipboard.
 - **The panel warns when hypridle is missing**, and starts the timings on its own once it is installed.
 - **Locking is not changed.** Omarchy still locks the screen before sleep. If you do not want a password after wake, see [Sleep without a password](#sleep-without-a-password).
 
