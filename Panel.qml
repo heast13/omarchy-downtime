@@ -238,7 +238,7 @@ Panel {
           width: parent.width
           spacing: Style.space(10)
 
-          NumberField {
+          Stepper {
             visible: root.wallpaperEnabled
             label: root.tr("wallpaperEvery")
             width: parent.width - nextButton.width - parent.spacing
@@ -273,7 +273,7 @@ Panel {
           onToggled: root.persist({ screensaverEnabled: !root.screensaverEnabled })
         }
 
-        NumberField {
+        Stepper {
           width: parent.width
           visible: root.screensaverEnabled
           label: root.tr("screensaverAfter")
@@ -309,7 +309,7 @@ Panel {
           font.pixelSize: Style.font.caption
         }
 
-        NumberField {
+        Stepper {
           width: parent.width
           visible: root.dimEnabled && root.dimSupported
           enabled: root.screensaverEnabled
@@ -333,7 +333,7 @@ Panel {
           onToggled: root.persistTiming("screenOff", !root.screenOffEnabled, root.screenOffMinutes)
         }
 
-        NumberField {
+        Stepper {
           width: parent.width
           visible: root.screenOffEnabled
           label: root.tr("screenOffAfter")
@@ -359,7 +359,7 @@ Panel {
           onToggled: root.persistTiming("suspend", !root.suspendEnabled, root.suspendMinutes)
         }
 
-        NumberField {
+        Stepper {
           width: parent.width
           visible: root.suspendEnabled
           enabled: !root.shutdownActive
@@ -417,7 +417,7 @@ Panel {
 
           readonly property real fieldWidth: (width - spacing) / 2
 
-          NumberField {
+          Stepper {
             width: shutdownFields.fieldWidth
             label: root.tr("hours")
             fieldWidth: width
@@ -429,7 +429,7 @@ Panel {
             onModified: function(v) { root.persistShutdown(v, root.shutdownMinutes % 60) }
           }
 
-          NumberField {
+          Stepper {
             width: shutdownFields.fieldWidth
             label: root.tr("minutes")
             fieldWidth: width
