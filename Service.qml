@@ -181,6 +181,9 @@ Item {
   // greys out dimming when not. Assumed until a probe says otherwise, and a
   // probe that cannot tell (busy, displays off) keeps the last answer.
   property bool dimSupported: true
+  // Normal brightness of the brightest display, for the widget's fade time.
+  // -1 while unknown.
+  property int brightness: -1
 
   function probeDim() {
     if (!dimProbe.running) dimProbe.running = true
@@ -189,6 +192,14 @@ Item {
   Process {
     id: dimProbe
     command: [root.dimScript, "probe"]
+    // Printed only when the probe succeeds.
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var v = parseInt(text, 10)
+        if (v >= 0 && v <= 100) root.brightness = v
+      }
+    }
     onExited: function(code) {
       if (code === 0) root.dimSupported = true
       else if (code === 1) root.dimSupported = false

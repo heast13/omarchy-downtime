@@ -32,6 +32,23 @@ Panel {
   readonly property int fadeStart: Settings.fadeStart(settings)
   readonly property int fadeStep: Settings.fadeStep(settings)
   readonly property int fadePercent: Settings.fadePercent(settings)
+  readonly property int brightness: service ? service.brightness : -1
+  // When the fade reaches its target, counted from the last input. The
+  // screensaver ends it early, or without one the screen turning off.
+  readonly property string fadeEta: {
+    if (brightness < 0) return ""
+    if (brightness <= fadePercent) return root.tr("fadeNothing", brightness)
+    var start = fadeStart * 60
+    var done = start + (brightness - fadePercent) * fadeStep
+    var stop = screensaverEnabled ? screensaverMinutes * 60 : (screenOffEnabled ? screenOffMinutes * 60 : 0)
+    if (stop > 0 && stop < done) {
+      var reached = brightness - Math.max(0, Math.floor((stop - start) / fadeStep))
+      return root.tr(screensaverEnabled ? "fadeCutSaver" : "fadeCutOff", [Math.round(stop / 60), reached])
+    }
+    var sec = done % 60
+    var time = Math.floor(done / 60) + (sec ? ":" + (sec < 10 ? "0" : "") + sec : "") + " " + root.tr("minShort")
+    return root.tr("fadeEta", [brightness, time])
+  }
   readonly property bool screenOffEnabled: Settings.enabled(settings, "screenOff")
   readonly property int screenOffMinutes: Settings.minutes(settings, "screenOff")
   readonly property bool suspendEnabled: Settings.enabled(settings, "suspend")
@@ -399,6 +416,17 @@ Panel {
           text: root.tr("fadeAfterSaver")
           wrapMode: Text.WordWrap
           color: Color.urgent
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+
+        Text {
+          width: parent.width
+          visible: root.fadeEnabled && root.dimSupported && root.fadeEta !== ""
+            && !(root.screensaverEnabled && root.fadeStart >= root.screensaverMinutes)
+          text: root.fadeEta
+          wrapMode: Text.WordWrap
+          color: root.fg
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
         }

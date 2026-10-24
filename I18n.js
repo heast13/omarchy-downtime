@@ -18,6 +18,11 @@ var strings = {
     fadeTo: "Fade to … %",
     fadeNote: "Lowers the brightness by 1 % per step, down to the target. Any activity brings it back.",
     fadeAfterSaver: "Starts no earlier than the screensaver, so it never shows. Pick a shorter time.",
+    fadeEta: "From %1 % it reaches the target after %2 idle.",
+    fadeCutSaver: "The screensaver starts first, after %1 min. By then: %2 %.",
+    fadeCutOff: "The screen turns off first, after %1 min. By then: %2 %.",
+    fadeNothing: "Already at %1 %, so there is nothing to dim.",
+    minShort: "min",
     dimUnsupported: "This display's brightness can't be controlled. On a monitor, turn on DDC/CI in its own menu.",
     screenOff: "SCREEN OFF",
     screenOffAfter: "Screen off after … min",
@@ -58,6 +63,11 @@ var strings = {
     fadeTo: "Abdunkeln auf … %",
     fadeNote: "Senkt die Helligkeit pro Stufe um 1 % bis zum Ziel. Jede Eingabe stellt sie zurück.",
     fadeAfterSaver: "Beginnt nicht vor dem Bildschirmschoner und wirkt darum nie. Kürzere Zeit wählen.",
+    fadeEta: "Von %1 % aus ist das Ziel nach %2 Untätigkeit erreicht.",
+    fadeCutSaver: "Der Bildschirmschoner kommt vorher, nach %1 Min. Bis dahin: %2 %.",
+    fadeCutOff: "Der Bildschirm geht vorher aus, nach %1 Min. Bis dahin: %2 %.",
+    fadeNothing: "Schon bei %1 %, darum gibt es nichts zu dimmen.",
+    minShort: "Min",
     dimUnsupported: "Die Helligkeit dieses Bildschirms lässt sich nicht steuern. Bei Monitoren: DDC/CI im Monitormenü einschalten.",
     screenOff: "BILDSCHIRM AUS",
     screenOffAfter: "Bildschirm aus nach … Min",
@@ -92,8 +102,11 @@ function language(setting, localeName) {
   return strings[prefix] ? prefix : "en"
 }
 
+// arg fills %1, or an array fills %1, %2, ...
 function tr(lang, key, arg) {
   var table = strings[lang] || strings.en
   var text = table[key] !== undefined ? table[key] : strings.en[key]
-  return arg !== undefined ? String(text).replace("%1", arg) : text
+  if (arg === undefined) return text
+  var args = Array.isArray(arg) ? arg : [arg]
+  return String(text).replace(/%(\d)/g, function(m, n) { return args[n - 1] !== undefined ? args[n - 1] : m })
 }

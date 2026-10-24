@@ -11,6 +11,8 @@
 #        as a safety net whenever saved values are left behind.
 # probe  exits 0 when at least one display's brightness can be controlled,
 #        1 when none can, 3 when it cannot tell (busy, or every display off).
+#        On 0 it prints the highest normal brightness (a dimmed display counts
+#        with its saved value), so the widget can tell how long a fade takes.
 # fade-start  (called by hypridle once the idle delay passed) lowers every lit
 #        display by one percent every <step-seconds> down to <percent>, in a
 #        transient unit that stays alive until fade-stop. Nothing happens
@@ -166,18 +168,24 @@ fade() {
 
 # Only lit displays count: one that is off cannot answer and is no proof.
 probe() {
-  local monitor any=0
+  local monitor value current any=0 best=-1
   for monitor in $(lit_monitors); do
     any=1
+    value=$( [[ -f $SAVED ]] && awk -v m="$monitor" '$1 == m && $2 ~ /^[0-9]+$/ { print $2; exit }' "$SAVED")
     # A display that just woke up often misses its first DDC request. A
     # single miss would grey out dimming (and turn off the idle fade) until
     # the next probe.
     for _ in 1 2 3; do
       forget_ddc_failure "$monitor"
-      brightness "$monitor" >/dev/null && return 0
+      if current=$(brightness "$monitor"); then
+        value=${value:-$current}
+        (( value > best )) && best=$value
+        break
+      fi
       sleep 0.5
     done
   done
+  (( best >= 0 )) && { echo "$best"; return 0; }
   (( any )) && return 1
   return 3
 }
