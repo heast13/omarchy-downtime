@@ -73,7 +73,7 @@ Item {
     String(shutdownActive ? 0 : suspendMinutes),
     // Idle dimming runs in hypridle too. 0 seconds means off, and it stays off
     // while no display can be dimmed.
-    String(fadeEnabled && dimSupported ? fadeStart : 0),
+    String(fadeEnabled && dimSupported ? fadeStart * 60 : 0),
     String(fadeStep),
     String(fadePercent)
   ]

@@ -43,8 +43,9 @@ function dimPercent(settings) {
 }
 
 // Gradual dimming while idle: starts after a delay, then lowers the brightness
-// by one percent per step until the target is reached. All in seconds/percent.
-var FADE_START = { fallback: 150, min: 10, max: 3600 }
+// by one percent per step until the target is reached. Start in minutes,
+// step in seconds, target in percent.
+var FADE_START = { fallback: 3, min: 1, max: 60 }
 var FADE_STEP = { fallback: 5, min: 1, max: 60 }
 var FADE_PERCENT_FALLBACK = 50
 
@@ -57,7 +58,7 @@ function fadeValue(settings, key, range) {
   return isFinite(v) && v >= range.min && v <= range.max ? v : range.fallback
 }
 
-function fadeStart(settings) { return fadeValue(settings, "idleDimStartSeconds", FADE_START) }
+function fadeStart(settings) { return fadeValue(settings, "idleDimStartMinutes", FADE_START) }
 function fadeStep(settings) { return fadeValue(settings, "idleDimStepSeconds", FADE_STEP) }
 
 function fadePercent(settings) {

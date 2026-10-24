@@ -336,7 +336,7 @@ Panel {
           enabled: root.dimSupported
           opacity: enabled ? 1 : 0.4
           checked: root.fadeEnabled && root.dimSupported
-          onToggled: root.persist({ idleDimEnabled: !root.fadeEnabled, idleDimStartSeconds: root.fadeStart,
+          onToggled: root.persist({ idleDimEnabled: !root.fadeEnabled, idleDimStartMinutes: root.fadeStart,
             idleDimStepSeconds: root.fadeStep, idleDimPercent: root.fadePercent })
         }
 
@@ -350,7 +350,7 @@ Panel {
           from: Settings.FADE_START.min
           to: Settings.FADE_START.max
           value: root.fadeStart
-          onModified: function(v) { root.persist({ idleDimEnabled: true, idleDimStartSeconds: v }) }
+          onModified: function(v) { root.persist({ idleDimEnabled: true, idleDimStartMinutes: v }) }
         }
 
         Stepper {
