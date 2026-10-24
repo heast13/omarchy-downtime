@@ -486,7 +486,9 @@ Panel {
         Text {
           width: parent.width
           opacity: root.shutdownActive ? 0.4 : 1
-          text: root.tr("sleepNote")
+          // Opening the screensaver restarts the idle clock; without one it
+          // runs from the last input.
+          text: root.tr(root.screensaverEnabled ? "sleepNote" : "sleepNoteNoSaver")
           wrapMode: Text.WordWrap
           color: Qt.darker(root.fg, 1.4)
           font.family: root.fontFamily
