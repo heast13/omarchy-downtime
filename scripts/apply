@@ -143,13 +143,9 @@ tmp=$(mktemp "$HYPRIDLE_CONF.XXXXXX") || exit 1
     echo
     echo "listener {"
     echo "    timeout = $((OFF_MIN * 60))"
-    # With idle dimming, brightness is restored while the display still
-    # answers, so it wakes up at full brightness.
-    if (( FADE_START > 0 )); then
-      echo "    on-timeout = '$DIM_SCRIPT' fade-stop 10; $DPMS_OFF"
-    else
-      echo "    on-timeout = $DPMS_OFF"
-    fi
+    # Dimmed displays stay dimmed while off: restoring them first would flash
+    # them bright right before they go dark. Activity restores them on wake.
+    echo "    on-timeout = $DPMS_OFF"
     echo "    on-resume = $DPMS_ON"
     echo "}"
   fi

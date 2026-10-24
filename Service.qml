@@ -71,9 +71,10 @@ Item {
     String(screenOffMinutes),
     // Sleep would stop the shutdown timer from ever firing, so it pauses.
     String(shutdownActive ? 0 : suspendMinutes),
-    // Idle dimming runs in hypridle too. 0 seconds means off, and it stays off
-    // while no display can be dimmed.
-    String(fadeEnabled && dimSupported ? fadeStart * 60 : 0),
+    // Idle dimming runs in hypridle too. 0 seconds means off. It does not
+    // follow dimSupported: a probe that missed a display just waking up would
+    // turn it off, and on a display without control it changes nothing anyway.
+    String(fadeEnabled ? fadeStart * 60 : 0),
     String(fadeStep),
     String(fadePercent)
   ]

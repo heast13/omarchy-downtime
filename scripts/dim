@@ -13,9 +13,10 @@
 #        1 when none can, 3 when it cannot tell (busy, or every display off).
 # fade-start  (called by hypridle once the idle delay passed) lowers every lit
 #        display by one percent every <step-seconds> down to <percent>, in a
-#        transient unit that stays alive until fade-stop.
-# fade-stop    (called on activity, and before the screen turns off) ends that
-#        unit and restores the saved brightness, waiting up to <seconds> (180).
+#        transient unit that stays alive until fade-stop. Nothing happens
+#        while Omarchy's Stay Awake is on.
+# fade-stop    (called on activity) ends that unit and restores the saved
+#        brightness, waiting up to <seconds> (180) for displays to wake up.
 #
 # Brightness goes through omarchy-brightness-display, the same path as the
 # brightness keys: backlight on laptops, DDC/CI on external monitors.
@@ -26,6 +27,7 @@ SAVED="$STATE_DIR/dim-saved"
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/downtime-dim.lock"
 RESTORE_SECONDS=180
 FADE_UNIT=downtime-fade.service
+STAY_AWAKE="$HOME/.local/state/omarchy/indicators/stay-awake"
 # A display in deep sleep can drop off the bus entirely while it wakes up
 # (Hyprland shows a FALLBACK output meanwhile). It is waited for this long
 # before it counts as unplugged.
@@ -127,7 +129,7 @@ up() {
 # restore never races a write. Afterwards it just waits to be stopped: the
 # service's safety net leaves saved values alone while this unit is active.
 fade() {
-  local target=$1 step=$2 monitor current next saved
+  local target=$1 step=$2 monitor current next saved lit
   local -A level=()
   mkdir -p "$STATE_DIR"
   flock 9
@@ -145,7 +147,10 @@ fade() {
     # The screensaver's own dimming takes over; never lift it back up.
     saver_running && break
     flock 9
+    # A display that turned off keeps its level until activity restores it.
+    lit=" $(lit_monitors | tr '\n' ' ')"
     for monitor in "${!level[@]}"; do
+      [[ $lit == *" $monitor "* ]] || continue
       next=$(( level[$monitor] - 1 ))
       omarchy-brightness-display --no-osd --monitor "$monitor" "$next%" >/dev/null 2>&1
       level[$monitor]=$next
@@ -161,7 +166,14 @@ probe() {
   local monitor any=0
   for monitor in $(lit_monitors); do
     any=1
-    brightness "$monitor" >/dev/null && return 0
+    # A display that just woke up often misses its first DDC request. A
+    # single miss would grey out dimming (and turn off the idle fade) until
+    # the next probe.
+    for _ in 1 2 3; do
+      forget_ddc_failure "$monitor"
+      brightness "$monitor" >/dev/null && return 0
+      sleep 0.5
+    done
   done
   (( any )) && return 1
   return 3
@@ -199,6 +211,8 @@ fade-start)
   (( $# == 3 )) && [[ $2 =~ ^[0-9]{1,2}$ ]] && (( 10#$2 >= 1 && 10#$2 <= 99 )) \
     && [[ $3 =~ ^[0-9]{1,2}$ ]] && (( 10#$3 >= 1 && 10#$3 <= 60 )) || usage
   systemctl --user stop "$FADE_UNIT" 2>/dev/null
+  # Omarchy's Stay Awake leaves the screen as it is.
+  [[ -e $STAY_AWAKE ]] && exit 0
   exec systemd-run --user --quiet --collect --unit="${FADE_UNIT%.service}" \
     "$(readlink -f "$0")" fade-run $(( 10#$2 )) $(( 10#$3 ))
   ;;
