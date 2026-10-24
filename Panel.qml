@@ -24,7 +24,8 @@ Panel {
   readonly property int screensaverMinutes: intSetting("screensaverMinutes",
     service ? Math.max(1, Math.round(service.systemSaverSeconds / 60)) : 5, 1)
   readonly property bool dimEnabled: Settings.dimEnabled(settings)
-  readonly property bool dimSupported: !service || service.dimSupported
+  // Both dimming sections exist only while a display's brightness can be set.
+  readonly property bool dimSupported: !!service && service.dimSupported
   // Dimming follows the screensaver and needs a display whose brightness can be set.
   readonly property bool dimAvailable: screensaverEnabled && dimSupported
   readonly property int dimPercent: Settings.dimPercent(settings)
@@ -238,7 +239,7 @@ Panel {
         Text {
           width: parent.width
           visible: !!root.service && root.service.hypridleMissing
-            && (root.screenOffEnabled || root.suspendEnabled || root.fadeEnabled)
+            && (root.screenOffEnabled || root.suspendEnabled || (root.fadeEnabled && root.dimSupported))
           text: root.tr("hypridleMissing")
           wrapMode: Text.WordWrap
           color: Color.urgent
@@ -249,7 +250,7 @@ Panel {
         Text {
           width: parent.width
           visible: !!root.service && root.service.stayAwake
-            && (root.screenOffEnabled || root.suspendEnabled || root.fadeEnabled)
+            && (root.screenOffEnabled || root.suspendEnabled || (root.fadeEnabled && root.dimSupported))
           text: root.tr("stayAwake")
           wrapMode: Text.WordWrap
           color: Qt.darker(root.fg, 1.4)
@@ -319,26 +320,18 @@ Panel {
         }
 
         // ---------- Dim ----------
-        PanelSeparator { foreground: root.fg }
+        // Hidden without a display whose brightness can be set, and greyed
+        // out while the screensaver is off. The stored settings stay, so they
+        // work again once a capable display is back.
+        PanelSeparator { foreground: root.fg; visible: root.dimSupported }
 
-        // Greyed out while the screensaver is off or no display can be dimmed.
-        // The stored setting stays, so it works again on a capable display.
         SwitchHeader {
           text: root.tr("dim")
+          visible: root.dimSupported
           enabled: root.dimAvailable
           opacity: enabled ? 1 : 0.4
-          checked: root.dimEnabled && root.dimSupported
+          checked: root.dimEnabled
           onToggled: root.persist({ screensaverDimEnabled: !root.dimEnabled, screensaverDimPercent: root.dimPercent })
-        }
-
-        Text {
-          width: parent.width
-          visible: !root.dimSupported
-          text: root.tr("dimUnsupported")
-          wrapMode: Text.WordWrap
-          color: Qt.darker(root.fg, 1.4)
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
         }
 
         Stepper {
@@ -357,13 +350,12 @@ Panel {
         }
 
         // ---------- Dim when idle ----------
-        PanelSeparator { foreground: root.fg }
+        PanelSeparator { foreground: root.fg; visible: root.dimSupported }
 
         SwitchHeader {
           text: root.tr("fade")
-          enabled: root.dimSupported
-          opacity: enabled ? 1 : 0.4
-          checked: root.fadeEnabled && root.dimSupported
+          visible: root.dimSupported
+          checked: root.fadeEnabled
           onToggled: root.persist({ idleDimEnabled: !root.fadeEnabled, idleDimStartMinutes: root.fadeStart,
             idleDimStepSeconds: root.fadeStep, idleDimPercent: root.fadePercent })
         }

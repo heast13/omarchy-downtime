@@ -178,9 +178,10 @@ Item {
   function runDim(args) { Quickshell.execDetached([root.dimScript].concat(args)) }
 
   // Whether any display's brightness can be controlled at all. The widget
-  // greys out dimming when not. Assumed until a probe says otherwise, and a
-  // probe that cannot tell (busy, displays off) keeps the last answer.
-  property bool dimSupported: true
+  // hides both dimming sections when not. Unknown counts as no until a probe
+  // confirms it, and a probe that cannot tell (busy, displays off) keeps the
+  // last answer.
+  property bool dimSupported: false
   // Normal brightness of the brightest display, for the widget's fade time.
   // -1 while unknown.
   property int brightness: -1
