@@ -126,6 +126,9 @@ fi
 # Hyprland uses a Lua config, so dispatchers take the Lua form.
 DPMS_OFF="hyprctl dispatch 'hl.dsp.dpms({action = \"off\"})'"
 DPMS_ON="hyprctl dispatch 'hl.dsp.dpms({action = \"on\"})'"
+# Omarchy's Stay Awake keeps the screen on and the machine awake.
+STAY_AWAKE="$HOME/.local/state/omarchy/indicators/stay-awake"
+AWAKE="[ -e '$STAY_AWAKE' ] ||"
 
 mkdir -p "$STATE_DIR"
 tmp=$(mktemp "$HYPRIDLE_CONF.XXXXXX") || exit 1
@@ -145,7 +148,7 @@ tmp=$(mktemp "$HYPRIDLE_CONF.XXXXXX") || exit 1
     echo "    timeout = $((OFF_MIN * 60))"
     # Dimmed displays stay dimmed while off: restoring them first would flash
     # them bright right before they go dark. Activity restores them on wake.
-    echo "    on-timeout = $DPMS_OFF"
+    echo "    on-timeout = $AWAKE $DPMS_OFF"
     echo "    on-resume = $DPMS_ON"
     echo "}"
   fi
@@ -161,7 +164,7 @@ tmp=$(mktemp "$HYPRIDLE_CONF.XXXXXX") || exit 1
     echo
     echo "listener {"
     echo "    timeout = $((SUSPEND_MIN * 60))"
-    echo "    on-timeout = systemctl suspend"
+    echo "    on-timeout = $AWAKE systemctl suspend"
     echo "}"
   fi
 } >"$tmp"

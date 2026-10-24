@@ -132,6 +132,19 @@ Item {
     onLoadFailed: root.systemSaverOff = false
   }
 
+  // Omarchy's Stay Awake. Screen off, sleep and idle dimming check it
+  // themselves when their time comes; the widget only says so.
+  property bool stayAwake: false
+
+  FileView {
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/indicators/stay-awake"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.stayAwake = true
+    onLoadFailed: root.stayAwake = false
+  }
+
   FileView {
     id: shutdownFile
     path: root.stateDir + "/shutdown-at"

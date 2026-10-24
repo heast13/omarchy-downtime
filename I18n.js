@@ -17,6 +17,7 @@ var strings = {
     fadeStep: "One step every … sec",
     fadeTo: "Fade to … %",
     fadeNote: "Lowers the brightness by 1 % per step, down to the target. Any activity brings it back.",
+    fadeAfterSaver: "Starts no earlier than the screensaver, so it never shows. Pick a shorter time.",
     dimUnsupported: "This display's brightness can't be controlled. On a monitor, turn on DDC/CI in its own menu.",
     screenOff: "SCREEN OFF",
     screenOffAfter: "Screen off after … min",
@@ -39,7 +40,8 @@ var strings = {
     shutdownHero: "Shutdown %1",
     sleepPaused: "Paused while the shutdown timer runs.",
     tooltipShutdown: "Shutting down at %1",
-    hypridleMissing: "hypridle is not installed, so screen off and sleep do nothing. Install it with:\nomarchy pkg add hypridle"
+    hypridleMissing: "hypridle is not installed, so idle dimming, screen off and sleep do nothing. Install it with:\nomarchy pkg add hypridle",
+    stayAwake: "Stay Awake is on: no idle dimming, screen off or sleep until you turn it off."
   },
   de: {
     title: "Downtime",
@@ -55,6 +57,7 @@ var strings = {
     fadeStep: "Eine Stufe alle … Sek",
     fadeTo: "Abdunkeln auf … %",
     fadeNote: "Senkt die Helligkeit pro Stufe um 1 % bis zum Ziel. Jede Eingabe stellt sie zurück.",
+    fadeAfterSaver: "Beginnt nicht vor dem Bildschirmschoner und wirkt darum nie. Kürzere Zeit wählen.",
     dimUnsupported: "Die Helligkeit dieses Bildschirms lässt sich nicht steuern. Bei Monitoren: DDC/CI im Monitormenü einschalten.",
     screenOff: "BILDSCHIRM AUS",
     screenOffAfter: "Bildschirm aus nach … Min",
@@ -77,7 +80,8 @@ var strings = {
     shutdownHero: "Ausschalten %1",
     sleepPaused: "Pausiert, solange der Ausschalt-Timer läuft.",
     tooltipShutdown: "Fährt um %1 herunter",
-    hypridleMissing: "hypridle ist nicht installiert, darum tun Bildschirm aus und Energiesparmodus nichts. Installieren mit:\nomarchy pkg add hypridle"
+    hypridleMissing: "hypridle ist nicht installiert, darum tun Dimmen bei Untätigkeit, Bildschirm aus und Energiesparmodus nichts. Installieren mit:\nomarchy pkg add hypridle",
+    stayAwake: "Stay Awake ist an: kein Dimmen bei Untätigkeit, kein Bildschirm aus und kein Energiesparmodus, bis du es ausschaltest."
   }
 }
 

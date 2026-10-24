@@ -17,6 +17,7 @@
 #        while Omarchy's Stay Awake is on.
 # fade-stop    (called on activity) ends that unit and restores the saved
 #        brightness, waiting up to <seconds> (180) for displays to wake up.
+#        While a screensaver opens or runs, the service restores instead.
 #
 # Brightness goes through omarchy-brightness-display, the same path as the
 # brightness keys: backlight on laptops, DDC/CI on external monitors.
@@ -42,6 +43,8 @@ monitors() { hyprctl monitors -j 2>/dev/null | jq -r '.[].name'; }
 # Displays that are connected and lit. DDC rarely answers while a display is off.
 lit_monitors() { hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.dpmsStatus) | .name'; }
 saver_running() { pgrep -f '[o]rg.omarchy.screensaver' >/dev/null; }
+# The launcher runs before any screensaver window exists.
+saver_starting() { pgrep -f '[o]rg.omarchy.screensaver|[o]marchy-launch-screensaver' >/dev/null; }
 fade_running() { systemctl --user is-active --quiet "$FADE_UNIT"; }
 
 brightness() {
@@ -223,6 +226,10 @@ fade-run)
 fade-stop)
   (( $# <= 2 )) && [[ ${2:-$RESTORE_SECONDS} =~ ^[0-9]{1,3}$ ]] || usage
   systemctl --user stop "$FADE_UNIT" 2>/dev/null
+  # Opening the screensaver resets the idle clock, so it ends the fade like
+  # activity does. Restoring now would light up the screensaver; its own
+  # dimming takes over, and the service restores once it closes.
+  saver_starting && exit 0
   flock 9
   up $(( 10#${2:-$RESTORE_SECONDS} ))
   ;;

@@ -4,9 +4,15 @@
 # Usage: shutdown start <minutes> [en|de]   power off in <minutes>, replacing a running timer
 #        shutdown cancel [en|de]            cancel the running timer
 #        shutdown check                     forget a timer that is no longer running
+#        shutdown fire <deadline> [en|de]   (run by the timer) power off, unless it is late
+#        shutdown warn <deadline> [en|de]   (run by the warning timer) one minute's notice
 #
 # The timer runs as transient user units, so it survives shell restarts. Its
 # deadline (epoch seconds) lives in a state file the widget watches.
+# The timers follow the wall clock. A monotonic one pauses while the machine
+# sleeps, so a manual sleep would push the shutdown back while the widget
+# already shows it as done. One that comes due during sleep runs on wake, and
+# is then dropped instead of powering off right away.
 set -u
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/downtime"
@@ -14,9 +20,10 @@ DEADLINE_FILE="$STATE_DIR/shutdown-at"
 UNIT=downtime-shutdown
 WARN_UNIT=downtime-shutdown-warn
 MAX_MIN=1440
+LATE_SECONDS=120
 
 usage() {
-  echo "usage: shutdown start <minutes> [en|de] | cancel [en|de] | check" >&2
+  echo "usage: shutdown start <minutes> [en|de] | cancel [en|de] | check | fire <deadline> [en|de] | warn <deadline> [en|de]" >&2
   exit 2
 }
 
@@ -32,9 +39,11 @@ msg() {
     de:at) echo "Fährt um $arg herunter." ;;
     de:warn) echo "Fährt in 1 Minute herunter." ;;
     de:cancel) echo "Ausschalt-Timer abgebrochen." ;;
+    de:missed) echo "Ausschalt-Timer übersprungen: Der Rechner hat um $arg geschlafen." ;;
     *:at) echo "Shutting down at $arg." ;;
     *:warn) echo "Shutting down in 1 minute." ;;
     *:cancel) echo "Shutdown timer cancelled." ;;
+    *:missed) echo "Shutdown timer skipped: the computer was asleep at $arg." ;;
   esac
 }
 
@@ -42,6 +51,9 @@ lang_arg() {
   [[ -z ${1:-} || $1 == en || $1 == de ]] || usage
   echo "${1:-en}"
 }
+
+# A calendar time for systemd, in UTC so a clock change cannot shift it.
+at_utc() { date -u -d "@$1" '+%Y-%m-%d %H:%M:%S UTC'; }
 
 notify() {
   omarchy-notification-send -g 󰐥 "Downtime" "$1" >/dev/null 2>&1 || true
@@ -65,13 +77,14 @@ case ${1:-} in
 
     stop_units
     deadline=$(( $(date +%s) + minutes * 60 ))
+    self=$(readlink -f "$0")
     systemd-run --user --quiet --collect --unit="$UNIT" \
-      --on-active="${minutes}min" --timer-property=AccuracySec=1s \
-      systemctl poweroff || { rm -f "$DEADLINE_FILE"; exit 1; }
+      --on-calendar="$(at_utc "$deadline")" --timer-property=AccuracySec=1s \
+      "$self" fire "$deadline" "$lang" || { rm -f "$DEADLINE_FILE"; exit 1; }
     if (( minutes >= 2 )); then
       systemd-run --user --quiet --collect --unit="$WARN_UNIT" \
-        --on-active="$(( minutes - 1 ))min" --timer-property=AccuracySec=1s \
-        omarchy-notification-send -u critical -g 󰐥 "Downtime" "$(msg warn "$lang")" >/dev/null
+        --on-calendar="$(at_utc $(( deadline - 60 )))" --timer-property=AccuracySec=1s \
+        "$self" warn "$deadline" "$lang"
     fi
 
     mkdir -p "$STATE_DIR"
@@ -95,6 +108,25 @@ case ${1:-} in
     if [[ -f $DEADLINE_FILE ]] && ! systemctl --user is-active --quiet "$UNIT.timer"; then
       rm -f "$DEADLINE_FILE"
     fi
+    ;;
+  fire|warn)
+    (( $# == 2 || $# == 3 )) && [[ $2 =~ ^[0-9]{1,12}$ ]] || usage
+    deadline=$(( 10#$2 ))
+    lang=$(lang_arg "${3:-}") || exit 2
+    late=$(( $(date +%s) - deadline ))
+    if [[ $1 == warn ]]; then
+      # Late after a sleep: the real notice (or the skip message) follows.
+      (( late < 0 )) && omarchy-notification-send -u critical -g 󰐥 "Downtime" "$(msg warn "$lang")" >/dev/null 2>&1
+      exit 0
+    fi
+    serialize
+    if (( late > LATE_SECONDS )); then
+      stop_units
+      rm -f "$DEADLINE_FILE"
+      notify "$(msg missed "$lang" "$(date -d "@$deadline" +%H:%M)")"
+      exit 0
+    fi
+    systemctl poweroff
     ;;
   *)
     usage

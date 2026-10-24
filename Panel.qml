@@ -229,6 +229,17 @@ Panel {
           font.pixelSize: Style.font.caption
         }
 
+        Text {
+          width: parent.width
+          visible: !!root.service && root.service.stayAwake
+            && (root.screenOffEnabled || root.suspendEnabled || root.fadeEnabled)
+          text: root.tr("stayAwake")
+          wrapMode: Text.WordWrap
+          color: Qt.darker(root.fg, 1.4)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+
         // ---------- Wallpaper ----------
         PanelSeparator { foreground: root.fg }
 
@@ -377,6 +388,19 @@ Panel {
           to: 99
           value: root.fadePercent
           onModified: function(v) { root.persist({ idleDimEnabled: true, idleDimPercent: v }) }
+        }
+
+        // Opening the screensaver restarts the idle clock, so a later start
+        // only comes while the screensaver already dims.
+        Text {
+          width: parent.width
+          visible: root.fadeEnabled && root.dimSupported && root.screensaverEnabled
+            && root.fadeStart >= root.screensaverMinutes
+          text: root.tr("fadeAfterSaver")
+          wrapMode: Text.WordWrap
+          color: Color.urgent
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
         }
 
         Text {
