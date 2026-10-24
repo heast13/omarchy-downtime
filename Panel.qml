@@ -28,6 +28,10 @@ Panel {
   // Dimming follows the screensaver and needs a display whose brightness can be set.
   readonly property bool dimAvailable: screensaverEnabled && dimSupported
   readonly property int dimPercent: Settings.dimPercent(settings)
+  readonly property bool fadeEnabled: Settings.fadeEnabled(settings)
+  readonly property int fadeStart: Settings.fadeStart(settings)
+  readonly property int fadeStep: Settings.fadeStep(settings)
+  readonly property int fadePercent: Settings.fadePercent(settings)
   readonly property bool screenOffEnabled: Settings.enabled(settings, "screenOff")
   readonly property int screenOffMinutes: Settings.minutes(settings, "screenOff")
   readonly property bool suspendEnabled: Settings.enabled(settings, "suspend")
@@ -217,7 +221,7 @@ Panel {
         Text {
           width: parent.width
           visible: !!root.service && root.service.hypridleMissing
-            && (root.screenOffEnabled || root.suspendEnabled)
+            && (root.screenOffEnabled || root.suspendEnabled || root.fadeEnabled)
           text: root.tr("hypridleMissing")
           wrapMode: Text.WordWrap
           color: Color.urgent
@@ -322,6 +326,67 @@ Panel {
           to: 99
           value: root.dimPercent
           onModified: function(v) { root.persist({ screensaverDimEnabled: true, screensaverDimPercent: v }) }
+        }
+
+        // ---------- Dim when idle ----------
+        PanelSeparator { foreground: root.fg }
+
+        SwitchHeader {
+          text: root.tr("fade")
+          enabled: root.dimSupported
+          opacity: enabled ? 1 : 0.4
+          checked: root.fadeEnabled && root.dimSupported
+          onToggled: root.persist({ idleDimEnabled: !root.fadeEnabled, idleDimStartSeconds: root.fadeStart,
+            idleDimStepSeconds: root.fadeStep, idleDimPercent: root.fadePercent })
+        }
+
+        Stepper {
+          width: parent.width
+          visible: root.fadeEnabled && root.dimSupported
+          label: root.tr("fadeStart")
+          fieldWidth: width
+          foreground: root.fg
+          fontFamily: root.fontFamily
+          from: Settings.FADE_START.min
+          to: Settings.FADE_START.max
+          value: root.fadeStart
+          onModified: function(v) { root.persist({ idleDimEnabled: true, idleDimStartSeconds: v }) }
+        }
+
+        Stepper {
+          width: parent.width
+          visible: root.fadeEnabled && root.dimSupported
+          label: root.tr("fadeStep")
+          fieldWidth: width
+          foreground: root.fg
+          fontFamily: root.fontFamily
+          from: Settings.FADE_STEP.min
+          to: Settings.FADE_STEP.max
+          value: root.fadeStep
+          onModified: function(v) { root.persist({ idleDimEnabled: true, idleDimStepSeconds: v }) }
+        }
+
+        Stepper {
+          width: parent.width
+          visible: root.fadeEnabled && root.dimSupported
+          label: root.tr("fadeTo")
+          fieldWidth: width
+          foreground: root.fg
+          fontFamily: root.fontFamily
+          from: 1
+          to: 99
+          value: root.fadePercent
+          onModified: function(v) { root.persist({ idleDimEnabled: true, idleDimPercent: v }) }
+        }
+
+        Text {
+          width: parent.width
+          visible: root.fadeEnabled && root.dimSupported
+          text: root.tr("fadeNote")
+          wrapMode: Text.WordWrap
+          color: Qt.darker(root.fg, 1.4)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
         }
 
         // ---------- Screen off ----------

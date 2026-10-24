@@ -1,8 +1,11 @@
 #!/bin/bash
 # Downtime: applies the screensaver delay (shell.json) and the screen-off and
-# sleep delays (its own hypridle instance).
+# sleep delays (its own hypridle instance), plus the gradual idle dimming.
 #
 # Usage: apply <on|off|keep> <screensaver-minutes|keep> <screen-off-minutes> <sleep-minutes>
+#              <fade-start-seconds> <fade-step-seconds> <fade-percent>
+#
+# A fade start of 0 turns the idle dimming off.
 #
 # "keep" leaves that part of Omarchy's screensaver (its on/off toggle or its
 # delay) exactly as it is, so only what the user changed in the widget is written.
@@ -15,13 +18,13 @@ UNIT=downtime-hypridle.service
 MAX_MIN=1440
 
 usage() {
-  echo "usage: apply <on|off|keep> <screensaver-minutes|keep> <screen-off-minutes> <sleep-minutes>" >&2
+  echo "usage: apply <on|off|keep> <screensaver-minutes|keep> <screen-off-minutes> <sleep-minutes> <fade-start-seconds> <fade-step-seconds> <fade-percent>" >&2
   exit 2
 }
 
 # Refuse anything unexpected rather than guess. A guessed screensaver value can
 # lock the session on the spot (see below).
-(( $# == 4 )) || usage
+(( $# == 7 )) || usage
 SAVER_STATE=$1
 SAVER_MIN=$2
 [[ $SAVER_STATE == on || $SAVER_STATE == off || $SAVER_STATE == keep ]] || usage
@@ -37,6 +40,19 @@ if [[ $SAVER_MIN != keep ]]; then
 fi
 OFF_MIN=$(( 10#$3 ))
 SUSPEND_MIN=$(( 10#$4 ))
+
+# Idle dimming: seconds before it starts (0 = off), seconds per step, target percent.
+for value in "$5" "$6" "$7"; do
+  [[ $value =~ ^[0-9]{1,4}$ ]] || usage
+done
+FADE_START=$(( 10#$5 ))
+FADE_STEP=$(( 10#$6 ))
+FADE_PERCENT=$(( 10#$7 ))
+(( FADE_START <= 3600 )) || usage
+if (( FADE_START > 0 )); then
+  (( FADE_START >= 10 && FADE_STEP >= 1 && FADE_STEP <= 60 && FADE_PERCENT >= 1 && FADE_PERCENT <= 99 )) || usage
+fi
+DIM_SCRIPT="$(dirname "$(readlink -f "$0")")/dim"
 
 # Never let two runs interleave, or they overwrite each other's work.
 exec 9>"${XDG_RUNTIME_DIR:-/tmp}/downtime.lock"
@@ -127,8 +143,22 @@ tmp=$(mktemp "$HYPRIDLE_CONF.XXXXXX") || exit 1
     echo
     echo "listener {"
     echo "    timeout = $((OFF_MIN * 60))"
-    echo "    on-timeout = $DPMS_OFF"
+    # With idle dimming, brightness is restored while the display still
+    # answers, so it wakes up at full brightness.
+    if (( FADE_START > 0 )); then
+      echo "    on-timeout = '$DIM_SCRIPT' fade-stop 10; $DPMS_OFF"
+    else
+      echo "    on-timeout = $DPMS_OFF"
+    fi
     echo "    on-resume = $DPMS_ON"
+    echo "}"
+  fi
+  if (( FADE_START > 0 )); then
+    echo
+    echo "listener {"
+    echo "    timeout = $FADE_START"
+    echo "    on-timeout = '$DIM_SCRIPT' fade-start $FADE_PERCENT $FADE_STEP"
+    echo "    on-resume = '$DIM_SCRIPT' fade-stop"
     echo "}"
   fi
   if (( SUSPEND_MIN > 0 )); then
@@ -142,7 +172,10 @@ tmp=$(mktemp "$HYPRIDLE_CONF.XXXXXX") || exit 1
 mv -f "$tmp" "$HYPRIDLE_CONF"
 
 systemctl --user stop "$UNIT" 2>/dev/null
-if (( OFF_MIN > 0 || SUSPEND_MIN > 0 )); then
+# A fade whose hypridle is gone would never be told to stop. The service's
+# safety net restores the saved brightness afterwards.
+systemctl --user stop downtime-fade.service 2>/dev/null
+if (( OFF_MIN > 0 || SUSPEND_MIN > 0 || FADE_START > 0 )); then
   if ! command -v hypridle >/dev/null; then
     omarchy-notification-send -u critical -g 󰒲 "Downtime" \
       "hypridle is not installed. Install it with: omarchy pkg add hypridle" >/dev/null 2>&1

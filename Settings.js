@@ -42,6 +42,29 @@ function dimPercent(settings) {
   return isFinite(v) && v >= 1 && v <= 99 ? v : DIM_FALLBACK
 }
 
+// Gradual dimming while idle: starts after a delay, then lowers the brightness
+// by one percent per step until the target is reached. All in seconds/percent.
+var FADE_START = { fallback: 150, min: 10, max: 3600 }
+var FADE_STEP = { fallback: 5, min: 1, max: 60 }
+var FADE_PERCENT_FALLBACK = 50
+
+function fadeEnabled(settings) {
+  return !!settings && settings.idleDimEnabled === true
+}
+
+function fadeValue(settings, key, range) {
+  var v = Math.floor(Number(settings ? settings[key] : undefined))
+  return isFinite(v) && v >= range.min && v <= range.max ? v : range.fallback
+}
+
+function fadeStart(settings) { return fadeValue(settings, "idleDimStartSeconds", FADE_START) }
+function fadeStep(settings) { return fadeValue(settings, "idleDimStepSeconds", FADE_STEP) }
+
+function fadePercent(settings) {
+  var v = Math.floor(Number(settings ? settings.idleDimPercent : undefined))
+  return isFinite(v) && v >= 1 && v <= 99 ? v : FADE_PERCENT_FALLBACK
+}
+
 // Minutes shown in the field and used while the switch is on (never 0).
 function minutes(settings, name) {
   var stored = storedMinutes(settings, timings[name].minutes)

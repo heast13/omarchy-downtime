@@ -42,6 +42,10 @@ Item {
   readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend")
   readonly property bool dimEnabled: Settings.dimEnabled(settings)
   readonly property int dimPercent: Settings.dimPercent(settings)
+  readonly property bool fadeEnabled: Settings.fadeEnabled(settings)
+  readonly property int fadeStart: Settings.fadeStart(settings)
+  readonly property int fadeStep: Settings.fadeStep(settings)
+  readonly property int fadePercent: Settings.fadePercent(settings)
   readonly property string lang: I18n.language(settings ? settings.language : "auto", Qt.locale().name)
 
   // One-shot shutdown timer. The deadline (epoch seconds) comes from the state
@@ -66,7 +70,12 @@ Item {
     saverMinutesSet ? String(screensaverMinutes) : "keep",
     String(screenOffMinutes),
     // Sleep would stop the shutdown timer from ever firing, so it pauses.
-    String(shutdownActive ? 0 : suspendMinutes)
+    String(shutdownActive ? 0 : suspendMinutes),
+    // Idle dimming runs in hypridle too. 0 seconds means off, and it stays off
+    // while no display can be dimmed.
+    String(fadeEnabled && dimSupported ? fadeStart : 0),
+    String(fadeStep),
+    String(fadePercent)
   ]
 
   // The bar widget lives in bar.layout, or as a top-level entry in plugins[].
@@ -319,7 +328,7 @@ Item {
     "sleep 3; [[ -f \"$3/manifest.json\" ]] && jq -e --arg id \"$1\""
       + " '[(.bar.layout // {})[]?[]?, (.plugins // [])[]?] | any((if type == \"object\" then .id else . end) == $id)'"
       + " \"$4\" >/dev/null 2>&1 && exit 0;"
-      + " systemctl --user stop downtime-hypridle.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
+      + " systemctl --user stop downtime-hypridle.service downtime-fade.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
       + " rm -f \"$2/shutdown-at\"; f=\"$2/dim-saved\"; [[ -f $f ]] || exit 0; ok=1;"
       + " while read -r m v; do omarchy-brightness-display --no-osd --monitor \"$m\" \"$v%\" >/dev/null 2>&1 || ok=0; done <\"$f\";"
       + " (( ok )) && rm -f \"$f\"",
