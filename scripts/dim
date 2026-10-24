@@ -74,16 +74,16 @@ set_brightness() {
 down() {
   local target=$1 monitor current saved
   # Displays still saved are dimmed already (or unplugged and waiting for
-  # their restore). Saving them again would store the dimmed value, but the
-  # others are dimmed as usual.
+  # their restore). Saving them again would store the dimmed value, so they
+  # keep their saved one and are only dimmed further if still brighter.
   saved=" $( [[ -f $SAVED ]] && awk '{ print $1 }' "$SAVED" | tr '\n' ' ')"
   mkdir -p "$STATE_DIR"
   for monitor in $(monitors); do
-    [[ $saved == *" $monitor "* ]] && continue
     current=$(brightness "$monitor") || continue
     (( current > target )) || continue
-    # Saved before writing, so even a half-applied change gets restored.
-    echo "$monitor $current" >>"$SAVED"
+    # Saved before writing, so even a half-applied change gets restored. One
+    # that is saved already (partly faded when idle) keeps its first value.
+    [[ $saved == *" $monitor "* ]] || echo "$monitor $current" >>"$SAVED"
     set_brightness "$monitor" "$target"
   done
 }
@@ -142,6 +142,8 @@ fade() {
   flock -u 9
   while (( ${#level[@]} )); do
     sleep "$step"
+    # The screensaver's own dimming takes over; never lift it back up.
+    saver_running && break
     flock 9
     for monitor in "${!level[@]}"; do
       next=$(( level[$monitor] - 1 ))
