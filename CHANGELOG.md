@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.5.0 - 2026-10-24
+
+- Dim when idle: fades every display down by 1 % per step (default every
+  5 seconds, from 3 minutes idle, down to 50 %) and brings it back on any
+  input. The panel shows when the target is reached, or how far the fade gets
+  before the screensaver or screen off. It warns when the fade would start no
+  earlier than the screensaver.
+- The screensaver's dimming takes over from an idle fade without lighting the
+  screen up in between.
+- Omarchy's Stay Awake now pauses dimming when idle, screen off and sleep, and
+  the panel says so.
+- The shutdown timer follows the clock. Before, a manual sleep pushed it back
+  unnoticed, so the machine could power off later while the panel showed no
+  timer. A shutdown that comes due while the machine sleeps is skipped on wake
+  with a notification instead of powering off right away.
+- Without a display whose brightness can be set, both dimming sections are
+  left out of the panel instead of being greyed out. A display that misses its
+  first brightness request after waking up no longer counts as unsupported.
+- The sleep note says that times count from the last input when the
+  screensaver is off.
+
 ## 1.4.2 - 2026-10-11
 
 - Numbers in the panel are set with − and + buttons instead of a text field.
