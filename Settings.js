@@ -17,12 +17,38 @@ var timings = {
   shutdown: { flag: "", minutes: "shutdownMinutes", on: false, fallback: 60 }
 }
 
+// On battery, screen off and sleep can have times of their own. The source is
+// "ac" or "battery"; without one, or for any other timing, the AC keys count.
+// Battery keys that were never set follow the AC ones.
+var batteryTimings = {
+  screenOff: { flag: "screenOffBatteryEnabled", minutes: "screenOffBatteryMinutes" },
+  suspend: { flag: "suspendBatteryEnabled", minutes: "suspendBatteryMinutes" }
+}
+
+function battery(name, source) {
+  return source === "battery" && batteryTimings[name] ? batteryTimings[name] : null
+}
+
+// The keys a switch or a stepper writes for that source.
+function keys(name, source) {
+  return battery(name, source) || timings[name]
+}
+
+// Whether the battery has a time of its own for this timing.
+function batteryOwn(settings, name) {
+  var b = batteryTimings[name]
+  return !!settings && (settings[b.flag] !== undefined || settings[b.minutes] !== undefined)
+}
+
 function storedMinutes(settings, key) {
   var v = Number(settings ? settings[key] : undefined)
   return isFinite(v) && v >= 0 ? Math.min(MAX_MINUTES, Math.floor(v)) : -1
 }
 
-function enabled(settings, name) {
+function enabled(settings, name, source) {
+  var b = battery(name, source)
+  var own = b && settings ? settings[b.flag] : undefined
+  if (own !== undefined && own !== null) return own !== false
   var t = timings[name]
   var flag = settings ? settings[t.flag] : undefined
   if (flag !== undefined && flag !== null) return flag !== false
@@ -67,12 +93,15 @@ function fadePercent(settings) {
 }
 
 // Minutes shown in the field and used while the switch is on (never 0).
-function minutes(settings, name) {
+function minutes(settings, name, source) {
+  var b = battery(name, source)
+  var own = b ? storedMinutes(settings, b.minutes) : -1
+  if (own > 0) return own
   var stored = storedMinutes(settings, timings[name].minutes)
   return stored > 0 ? stored : timings[name].fallback
 }
 
-// Minutes handed to the apply script, where 0 means off.
-function effectiveMinutes(settings, name) {
-  return enabled(settings, name) ? minutes(settings, name) : 0
+// Minutes the service times, where 0 means off.
+function effectiveMinutes(settings, name, source) {
+  return enabled(settings, name, source) ? minutes(settings, name, source) : 0
 }

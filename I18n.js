@@ -45,8 +45,13 @@ var strings = {
     shutdownHero: "Shutdown %1",
     sleepPaused: "Paused while the shutdown timer runs.",
     tooltipShutdown: "Shutting down at %1",
-    hypridleMissing: "hypridle is not installed, so idle dimming, screen off and sleep do nothing. Install it with:\nomarchy pkg add hypridle",
-    stayAwake: "Stay Awake is on: no idle dimming, screen off or sleep until you turn it off."
+    stayAwake: "Stay Awake is on: no idle dimming, screen off or sleep until you turn it off.",
+    ac: "On AC",
+    battery: "On battery",
+    acShort: "AC",
+    batteryShort: "Battery",
+    now: "now",
+    batteryFollows: "On battery it follows the AC setting until you change it here."
   },
   de: {
     title: "Downtime",
@@ -90,8 +95,13 @@ var strings = {
     shutdownHero: "Ausschalten %1",
     sleepPaused: "Pausiert, solange der Ausschalt-Timer läuft.",
     tooltipShutdown: "Fährt um %1 herunter",
-    hypridleMissing: "hypridle ist nicht installiert, darum tun Dimmen bei Untätigkeit, Bildschirm aus und Energiesparmodus nichts. Installieren mit:\nomarchy pkg add hypridle",
-    stayAwake: "Stay Awake ist an: kein Dimmen bei Untätigkeit, kein Bildschirm aus und kein Energiesparmodus, bis du es ausschaltest."
+    stayAwake: "Stay Awake ist an: kein Dimmen bei Untätigkeit, kein Bildschirm aus und kein Energiesparmodus, bis du es ausschaltest.",
+    ac: "Am Netz",
+    battery: "Auf Akku",
+    acShort: "Netz",
+    batteryShort: "Akku",
+    now: "jetzt",
+    batteryFollows: "Auf Akku gilt die Netz-Einstellung, bis du sie hier änderst."
   }
 }
 

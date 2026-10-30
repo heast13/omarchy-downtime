@@ -1,7 +1,10 @@
 import QtQuick
+import QtQml.Models
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Services.UPower
+import Quickshell.Wayland
 import "Settings.js" as Settings
 import "I18n.js" as I18n
 
@@ -38,8 +41,12 @@ Item {
   readonly property int wallpaperMinutes: Settings.effectiveMinutes(settings, "wallpaper")
   readonly property bool screensaverEnabled: !settings || settings.screensaverEnabled !== false
   readonly property int screensaverMinutes: Math.min(Settings.MAX_MINUTES, Math.max(1, num("screensaverMinutes", 5)))
-  readonly property int screenOffMinutes: Settings.effectiveMinutes(settings, "screenOff")
-  readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend")
+  // Screen off and sleep follow the power source. A switch to or from battery
+  // changes the timings, so the idle timers start over with the new ones.
+  readonly property bool hasBattery: !!UPower.displayDevice && UPower.displayDevice.isPresent
+  readonly property string powerSource: hasBattery && UPower.onBattery ? "battery" : "ac"
+  readonly property int screenOffMinutes: Settings.effectiveMinutes(settings, "screenOff", powerSource)
+  readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend", powerSource)
   readonly property bool dimEnabled: Settings.dimEnabled(settings)
   readonly property int dimPercent: Settings.dimPercent(settings)
   readonly property bool fadeEnabled: Settings.fadeEnabled(settings)
@@ -67,17 +74,92 @@ Item {
 
   readonly property var applyArgs: [
     saverStateSet ? (screensaverEnabled ? "on" : "off") : "keep",
-    saverMinutesSet ? String(screensaverMinutes) : "keep",
-    String(screenOffMinutes),
-    // Sleep would stop the shutdown timer from ever firing, so it pauses.
-    String(shutdownActive ? 0 : suspendMinutes),
-    // Idle dimming runs in hypridle too. 0 seconds means off. It does not
-    // follow dimSupported: a probe that missed a display just waking up would
-    // turn it off, and on a display without control it changes nothing anyway.
-    String(fadeEnabled ? fadeStart * 60 : 0),
-    String(fadeStep),
-    String(fadePercent)
+    saverMinutesSet ? String(screensaverMinutes) : "keep"
   ]
+
+  // Screen off, idle dimming and sleep, each with its own idle timer below.
+  // Nothing runs before shell.json has been read.
+  function buildIdleListeners() {
+    if (!configLoaded) return []
+    var list = []
+    if (screenOffMinutes > 0) list.push({ kind: "screenOff", seconds: screenOffMinutes * 60 })
+    // Idle dimming does not follow dimSupported: a probe that missed a display
+    // just waking up would turn it off, and on a display without control it
+    // changes nothing anyway.
+    if (fadeEnabled) list.push({ kind: "fade", seconds: fadeStart * 60, step: fadeStep, percent: fadePercent })
+    // Sleep would stop the shutdown timer from ever firing, so it pauses.
+    if (suspendMinutes > 0 && !shutdownActive) list.push({ kind: "suspend", seconds: suspendMinutes * 60 })
+    return list
+  }
+
+  readonly property string idleKey: JSON.stringify(buildIdleListeners())
+  property var idleListeners: []
+
+  onIdleKeyChanged: idleDebounce.restart()
+
+  Timer {
+    id: idleDebounce
+    interval: 700
+    onTriggered: if (JSON.stringify(root.idleListeners) !== root.idleKey) root.idleListeners = JSON.parse(root.idleKey)
+  }
+
+  // Hyprland uses a Lua config, so dispatchers take the Lua form.
+  function dpms(action) {
+    Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.dpms({action = \"" + action + "\"})"])
+  }
+
+  // Omarchy's Stay Awake keeps the screen on and the machine awake. Playing
+  // media and other idle inhibitors hold the timers back (respectInhibitors).
+  function idleStarted(listener) {
+    if (listener.kind === "screenOff") {
+      // Dimmed displays stay dimmed while off: restoring them first would
+      // flash them bright right before they go dark. Activity restores them.
+      if (!stayAwake) dpms("off")
+    } else if (listener.kind === "fade") {
+      runDim(["fade-start", String(listener.percent), String(listener.step)])
+    } else if (listener.kind === "suspend" && !stayAwake) {
+      // An open screensaver would otherwise survive sleep and be the first
+      // thing you see on wake. omarchy-system-lock closes it the same way.
+      Quickshell.execDetached(["bash", "-c",
+        "pkill -x ttfx; pkill -f '[o]rg.omarchy.screensaver'; systemctl suspend"])
+    }
+  }
+
+  function idleEnded(listener) {
+    if (listener.kind === "screenOff") dpms("on")
+    else if (listener.kind === "fade") runDim(["fade-stop"])
+  }
+
+  // An IdleMonitor never fires again once its timeout changes at runtime, so
+  // every change of the timings creates the monitors anew. One that is
+  // destroyed while idle (a timing changed, a shell restart) ends its step,
+  // so the screen never stays off or dimmed without anything to bring it back.
+  Instantiator {
+    model: root.idleListeners
+    delegate: IdleMonitor {
+      required property var modelData
+      timeout: modelData.seconds
+      respectInhibitors: true
+      onIsIdleChanged: isIdle ? root.idleStarted(modelData) : root.idleEnded(modelData)
+      Component.onDestruction: if (isIdle) root.idleEnded(modelData)
+    }
+  }
+
+  // Waking up from sleep is no input, so a display turned off before sleep
+  // would stay dark. Timers do not count the time asleep but the wall clock
+  // does, so a jump means the machine just woke up.
+  property real lastWallClock: Date.now()
+
+  Timer {
+    interval: 5000
+    running: true
+    repeat: true
+    onTriggered: {
+      var t = Date.now()
+      if (t - root.lastWallClock > 30000) root.dpms("on")
+      root.lastWallClock = t
+    }
+  }
 
   // The bar widget lives in bar.layout, or as a top-level entry in plugins[].
   function findEntry(config) {
@@ -290,28 +372,6 @@ Item {
       // A timer stopped outside the widget leaves its deadline file behind.
       if (root.shutdownActive && !shutdownProc.running && !root.pendingShutdown) root.runShutdown(["check"])
       dimSavedFile.reload()
-      if (root.hypridleMissing) root.checkHypridle()
-    }
-  }
-
-  // Screen off and sleep need hypridle. The widget warns while it is missing,
-  // and once it appears the timings are applied again so it starts.
-  property bool hypridleMissing: false
-
-  function checkHypridle() {
-    if (!hypridleCheck.running) hypridleCheck.running = true
-  }
-
-  Process {
-    id: hypridleCheck
-    command: ["sh", "-c", "command -v hypridle"]
-    onExited: function(code) {
-      var missing = code !== 0
-      if (root.hypridleMissing && !missing) {
-        root.appliedKey = ""
-        root.scheduleApply()
-      }
-      root.hypridleMissing = missing
     }
   }
 
@@ -320,7 +380,6 @@ Item {
     // A shell restart while dimmed loses track of the screensaver windows.
     runDim(["check"])
     probeDim()
-    checkHypridle()
   }
 
   Timer {
@@ -347,14 +406,14 @@ Item {
   // wait and only clean up when the plugin really is disabled or removed: its
   // folder is gone or shell.json no longer lists it. Read from disk, because a
   // restarting shell may not answer yet or not have found its plugins. Then
-  // stop hypridle and a running shutdown timer and restore dimmed displays.
-  // Inline rather than in scripts/: on removal the folder is gone.
+  // stop the idle fade and a running shutdown timer and restore dimmed
+  // displays. Inline rather than in scripts/: on removal the folder is gone.
   Component.onDestruction: Quickshell.execDetached([
     "systemd-run", "--user", "--quiet", "--collect", "bash", "-c",
     "sleep 3; [[ -f \"$3/manifest.json\" ]] && jq -e --arg id \"$1\""
       + " '[(.bar.layout // {})[]?[]?, (.plugins // [])[]?] | any((if type == \"object\" then .id else . end) == $id)'"
       + " \"$4\" >/dev/null 2>&1 && exit 0;"
-      + " systemctl --user stop downtime-hypridle.service downtime-fade.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
+      + " systemctl --user stop downtime-fade.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
       + " rm -f \"$2/shutdown-at\"; f=\"$2/dim-saved\"; [[ -f $f ]] || exit 0; ok=1;"
       + " while read -r m v; do omarchy-brightness-display --no-osd --monitor \"$m\" \"$v%\" >/dev/null 2>&1 || ok=0; done <\"$f\";"
       + " (( ok )) && rm -f \"$f\"",

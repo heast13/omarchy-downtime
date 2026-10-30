@@ -13,7 +13,7 @@
 #        1 when none can, 3 when it cannot tell (busy, or every display off).
 #        On 0 it prints the highest normal brightness (a dimmed display counts
 #        with its saved value), so the widget can tell how long a fade takes.
-# fade-start  (called by hypridle once the idle delay passed) lowers every lit
+# fade-start  (called by the service once the idle delay passed) lowers every lit
 #        display by one percent every <step-seconds> down to <percent>, in a
 #        transient unit that stays alive until fade-stop. Nothing happens
 #        while Omarchy's Stay Awake is on.

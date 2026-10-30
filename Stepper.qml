@@ -6,10 +6,12 @@ import qs.Ui
 // It has no text input on purpose: an editable TextInput reads the Wayland
 // clipboard on every change, with no size or time limit. Values change with the
 // buttons (hold to repeat), the mouse wheel or the arrow keys.
-Column {
+// `inline` puts the label to the left of the field instead of above it.
+Grid {
   id: root
 
   property string label: ""
+  property bool inline: false
   property int value: 0
   property int from: 0
   property int to: 100
@@ -28,7 +30,9 @@ Column {
 
   signal modified(int value)
 
+  columns: inline ? 2 : 1
   spacing: Style.spacing.md
+  verticalItemAlignment: Grid.AlignVCenter
 
   onValueChanged: if (!commitTimer.running && _repeatDir === 0) current = value
 
@@ -88,6 +92,8 @@ Column {
   Text {
     textFormat: Text.PlainText
     visible: root.label !== ""
+    width: root.inline ? Math.max(0, root.width - root.fieldWidth - root.spacing) : implicitWidth
+    elide: Text.ElideRight
     text: root.label
     color: Qt.darker(root.foreground, 1.4)
     font.family: root.fontFamily

@@ -46,8 +46,12 @@
       { "key": "idleDimPercent", "type": "number", "label": "Fade to (%)", "min": 1, "max": 99, "step": 1, "defaultValue": 50 },
       { "key": "screenOffEnabled", "type": "boolean", "label": "Screen off", "defaultValue": true },
       { "key": "screenOffMinutes", "type": "number", "label": "Screen off after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
+      { "key": "screenOffBatteryEnabled", "type": "boolean", "label": "Screen off on battery", "defaultValue": true },
+      { "key": "screenOffBatteryMinutes", "type": "number", "label": "Screen off on battery after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 10 },
       { "key": "suspendEnabled", "type": "boolean", "label": "Sleep", "defaultValue": false },
       { "key": "suspendMinutes", "type": "number", "label": "Sleep after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 30 },
+      { "key": "suspendBatteryEnabled", "type": "boolean", "label": "Sleep on battery", "defaultValue": false },
+      { "key": "suspendBatteryMinutes", "type": "number", "label": "Sleep on battery after (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 30 },
       { "key": "shutdownMinutes", "type": "number", "label": "Shutdown timer (minutes)", "min": 1, "max": 1440, "step": 1, "defaultValue": 60 }
     ]
   }
