@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.0 - 2026-10-30
+
+- Screen off, sleep and dimming when idle no longer need `hypridle`. The
+  service times them itself with the same Wayland idle timers Omarchy uses for
+  its screensaver and lock, so the plugin works right after
+  `omarchy plugin add`. The hypridle warning in the panel is gone.
+- Updating stops the `downtime-hypridle.service` of earlier versions and
+  removes its generated config.
+- Displays turned off before sleep come back on after waking up, also without
+  any input.
+- Screen off and sleep have their own times on battery, each with its own
+  switch, for example sleep only on battery. They follow the AC times until
+  changed and take over as soon as the power source changes.
+- A more compact panel: one row per setting with its current value and
+  switch. A click opens its settings below it, one section at a time. Numbers
+  sit next to their labels, and the language switch moved into the header.
+
 ## 1.5.0 - 2026-10-24
 
 - Dim when idle: fades every display down by 1 % per step (default every
