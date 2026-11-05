@@ -79,6 +79,26 @@ Panel {
   }
   readonly property string shutdownLeft: duration(service ? service.shutdownMinutesLeft : 0)
 
+  // Changing the lock or screensaver turns Omarchy's idle off and on for a
+  // moment (scripts/apply), which looks like Stay Awake. Only a Stay Awake
+  // that lasts is shown, so the note never flashes while times are changed.
+  readonly property bool stayAwakeNow: !!service && service.stayAwake
+  property bool stayAwakeShown: false
+  onStayAwakeNowChanged: {
+    if (stayAwakeNow) stayAwakeDelay.restart()
+    else {
+      stayAwakeDelay.stop()
+      stayAwakeShown = false
+    }
+  }
+  Component.onCompleted: stayAwakeShown = stayAwakeNow
+
+  Timer {
+    id: stayAwakeDelay
+    interval: 3000
+    onTriggered: root.stayAwakeShown = root.stayAwakeNow
+  }
+
   // The section whose settings are open. One at a time keeps the panel short.
   property string expanded: ""
 
@@ -411,12 +431,6 @@ Panel {
             bordered: true
             onClicked: root.persist({ language: root.lang === "de" ? "en" : "de" })
           }
-        }
-
-        Note {
-          visible: !!root.service && root.service.stayAwake
-            && (root.screenOffEnabled || root.lockEnabled || root.suspendEnabled || (root.fadeEnabled && root.dimSupported))
-          text: root.tr("stayAwake")
         }
 
         PanelSeparator { foreground: root.fg }
@@ -785,6 +799,13 @@ Panel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
           }
+        }
+
+        // At the bottom, so it never pushes the rows away under the pointer.
+        Note {
+          visible: root.stayAwakeShown
+            && (root.screenOffEnabled || root.lockEnabled || root.suspendEnabled || (root.fadeEnabled && root.dimSupported))
+          text: root.tr("stayAwake")
         }
       }
     }
