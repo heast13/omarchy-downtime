@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.7.0 - 2026-11-05
+
+- New Lock section for Omarchy's idle lock (`idle.lock`), with its own times
+  on battery, each with its own switch. Omarchy's lock screen turns the
+  screen off a few seconds after locking, so with Screen off switched off the
+  screen still went dark and asked for the password. Now the lock can be off
+  on AC and on on battery, for example. It is left as it is until changed in
+  the widget, and given back its original value when the plugin is disabled or
+  removed.
+- The Screen off section says when the lock still turns the screen off.
+- Dim when idle tells when the lock cuts the fade short.
+- With `idle.screensaver` at 0 the screensaver shows as off, and switching it
+  on writes a delay, so it really starts.
+- A switch set from a terminal with `omarchy bar set` (without `--json`)
+  is stored as the text "false" or "true". "false" now counts as off; before,
+  any text counted as on.
+
 ## 1.6.0 - 2026-10-30
 
 - Screen off, sleep and dimming when idle no longer need `hypridle`. The
