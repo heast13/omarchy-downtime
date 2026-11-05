@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.1 - 2026-11-05
+
+- The Stay Awake note sits at the bottom of the panel, so it can never push
+  the rows away under the pointer.
+- Changing the lock or the screensaver no longer flashes that note: applying
+  them turns Omarchy's idle off and on for a moment, which looked like Stay
+  Awake. The note now shows only once Stay Awake lasts a few seconds.
+
 ## 1.7.0 - 2026-11-05
 
 - New Lock section for Omarchy's idle lock (`idle.lock`), with its own times
