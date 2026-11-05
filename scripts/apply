@@ -1,12 +1,13 @@
 #!/bin/bash
 # Downtime: applies the screensaver (Omarchy's own toggle and idle.screensaver
-# in shell.json). Screen off, sleep and the idle dimming are timed by the
-# service itself.
+# in shell.json) and the idle lock (idle.lock). Screen off, sleep and the idle
+# dimming are timed by the service itself.
 #
-# Usage: apply <on|off|keep> <screensaver-minutes|keep>
+# Usage: apply <on|off|keep> <screensaver-minutes|keep> <lock-minutes|keep>
 #
-# "keep" leaves that part of Omarchy's screensaver (its on/off toggle or its
-# delay) exactly as it is, so only what the user changed in the widget is written.
+# "keep" leaves that part of Omarchy's idle settings (the screensaver toggle,
+# its delay or the lock) exactly as it is, so only what the user changed in the
+# widget is written. A lock of 0 minutes turns Omarchy's idle lock off.
 set -u
 
 SHELL_JSON="$HOME/.config/omarchy/shell.json"
@@ -14,21 +15,26 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/downtime"
 MAX_MIN=1440
 
 usage() {
-  echo "usage: apply <on|off|keep> <screensaver-minutes|keep>" >&2
+  echo "usage: apply <on|off|keep> <screensaver-minutes|keep> <lock-minutes|keep>" >&2
   exit 2
 }
 
 # Refuse anything unexpected rather than guess. A guessed screensaver value can
 # lock the session on the spot (see below).
-(( $# == 2 )) || usage
+(( $# == 3 )) || usage
 SAVER_STATE=$1
 SAVER_MIN=$2
+LOCK_MIN=$3
 [[ $SAVER_STATE == on || $SAVER_STATE == off || $SAVER_STATE == keep ]] || usage
 if [[ $SAVER_MIN != keep ]]; then
   # At most four digits: longer numbers would wrap around in bash arithmetic.
   [[ $SAVER_MIN =~ ^[0-9]{1,4}$ ]] && (( 10#$SAVER_MIN <= MAX_MIN )) || usage
   SAVER=$(( 10#$SAVER_MIN * 60 ))
   (( SAVER >= 60 )) || SAVER=60
+fi
+if [[ $LOCK_MIN != keep ]]; then
+  [[ $LOCK_MIN =~ ^[0-9]{1,4}$ ]] && (( 10#$LOCK_MIN <= MAX_MIN )) || usage
+  LOCK=$(( 10#$LOCK_MIN * 60 ))
 fi
 
 # Never let two runs interleave, or they overwrite each other's work.
@@ -49,16 +55,38 @@ elif [[ $SAVER_STATE == on ]]; then
   omarchy-toggle screensaver-off off
 fi
 
-if [[ $SAVER_MIN != keep ]]; then
-  file_saver() { jq -r '.idle.screensaver // empty' "$SHELL_JSON" 2>/dev/null; }
+# ---------- idle.screensaver and idle.lock (Omarchy's own idle service) ----------
+
+# Only the values the user set in the widget are written.
+PATCH='{}'
+[[ $SAVER_MIN != keep ]] && PATCH=$(jq -c --argjson s "$SAVER" '. + {screensaver: $s}' <<<"$PATCH")
+[[ $LOCK_MIN != keep ]] && PATCH=$(jq -c --argjson l "$LOCK" '. + {lock: $l}' <<<"$PATCH")
+
+if [[ $PATCH != '{}' && -f $SHELL_JSON ]]; then
+  # The value idle.lock had before Downtime first wrote it (null when unset),
+  # so removing the plugin can give it back.
+  if [[ $LOCK_MIN != keep && ! -f $STATE_DIR/lock-original ]]; then
+    mkdir -p "$STATE_DIR"
+    jq -c '.idle.lock // null' "$SHELL_JSON" >"$STATE_DIR/lock-original" 2>/dev/null \
+      || rm -f "$STATE_DIR/lock-original"
+  fi
+
+  # Each wanted value as "key=value" lines, sorted, to compare with the file
+  # and with what the running shell uses.
+  wanted=$(jq -r 'to_entries[] | "\(.key)=\(.value)"' <<<"$PATCH" | sort)
+  file_idle() { jq -r --argjson p "$PATCH" '.idle as $i | $p | keys[] | "\(.)=\($i[.] // "")"' "$SHELL_JSON" 2>/dev/null | sort; }
+  shell_idle() {
+    omarchy-shell idle status 2>/dev/null \
+      | jq -r --argjson p "$PATCH" '. as $i | $p | keys[] | "\(.)=\($i[.] // "")"' 2>/dev/null | sort
+  }
   shell_status() { omarchy-shell idle status 2>/dev/null | jq -r ".$1 // empty" 2>/dev/null; }
 
   # Write atomically: a finished copy in the same folder, then rename, so the
   # shell never reads half a file.
-  write_saver() {
+  write_idle() {
     local tmp
     tmp=$(mktemp "$SHELL_JSON.XXXXXX") || return 1
-    if jq --argjson s "$SAVER" '.idle = ((.idle // {}) + {screensaver: $s})' "$SHELL_JSON" >"$tmp" \
+    if jq --argjson p "$PATCH" '.idle = ((.idle // {}) + $p)' "$SHELL_JSON" >"$tmp" \
       && jq -e . "$tmp" >/dev/null 2>&1; then
       chmod --reference="$SHELL_JSON" "$tmp"
       mv -f "$tmp" "$SHELL_JSON"
@@ -68,23 +96,21 @@ if [[ $SAVER_MIN != keep ]]; then
     fi
   }
 
-  SHELL_SAVER_BEFORE=$(shell_status screensaver)
+  SHELL_BEFORE=$(shell_idle)
 
-  if [[ -f $SHELL_JSON ]]; then
-    # The shell also writes shell.json from memory (for example when widget
-    # settings are saved). If it catches a stale copy, our value is lost again,
-    # so keep checking until file and shell agree.
-    for _ in {1..10}; do
-      [[ $(file_saver) != "$SAVER" ]] && write_saver
-      sleep 0.5
-      [[ $(file_saver) == "$SAVER" && $(shell_status screensaver) == "$SAVER" ]] && break
-    done
-  fi
+  # The shell also writes shell.json from memory (for example when widget
+  # settings are saved). If it catches a stale copy, our value is lost again,
+  # so keep checking until file and shell agree.
+  for _ in {1..10}; do
+    [[ $(file_idle) != "$wanted" ]] && write_idle
+    sleep 0.5
+    [[ $(file_idle) == "$wanted" && $(shell_idle) == "$wanted" ]] && break
+  done
 
   # The shell's IdleMonitor never fires again after its timeout changes at
   # runtime, so recreate it (off/on) - unless idle is deliberately off (Stay
   # Awake). The off state is persisted, so every exit path turns it back on.
-  if [[ $SHELL_SAVER_BEFORE != "$SAVER" && $(shell_status enabled) == true ]]; then
+  if [[ $SHELL_BEFORE != "$wanted" && $(shell_status enabled) == true ]]; then
     trap 'omarchy-shell -q idle enable >/dev/null 2>&1' EXIT
     trap 'exit 1' INT TERM HUP
     omarchy-shell -q idle disable >/dev/null 2>&1

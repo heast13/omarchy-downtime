@@ -13,6 +13,8 @@ var timings = {
   wallpaper: { flag: "wallpaperEnabled", minutes: "wallpaperMinutes", on: false, fallback: 10 },
   screenOff: { flag: "screenOffEnabled", minutes: "screenOffMinutes", on: true, fallback: 10 },
   suspend: { flag: "suspendEnabled", minutes: "suspendMinutes", on: false, fallback: 30 },
+  // Omarchy's own idle lock (idle.lock). See withSystemLock below.
+  lock: { flag: "lockEnabled", minutes: "lockMinutes", on: true, fallback: 5 },
   // One-shot: only the minutes are stored. Whether it runs is live state.
   shutdown: { flag: "", minutes: "shutdownMinutes", on: false, fallback: 60 }
 }
@@ -22,7 +24,8 @@ var timings = {
 // Battery keys that were never set follow the AC ones.
 var batteryTimings = {
   screenOff: { flag: "screenOffBatteryEnabled", minutes: "screenOffBatteryMinutes" },
-  suspend: { flag: "suspendBatteryEnabled", minutes: "suspendBatteryMinutes" }
+  suspend: { flag: "suspendBatteryEnabled", minutes: "suspendBatteryMinutes" },
+  lock: { flag: "lockBatteryEnabled", minutes: "lockBatteryMinutes" }
 }
 
 function battery(name, source) {
@@ -40,6 +43,37 @@ function batteryOwn(settings, name) {
   return !!settings && (settings[b.flag] !== undefined || settings[b.minutes] !== undefined)
 }
 
+// The lock is Omarchy's idle.lock. It is left alone until the user sets it
+// here; from then on Downtime writes it for the current power source.
+var LOCK_KEYS = ["lockEnabled", "lockMinutes", "lockBatteryEnabled", "lockBatteryMinutes"]
+
+function lockSet(settings) {
+  if (!settings) return false
+  for (var i = 0; i < LOCK_KEYS.length; i++) if (settings[LOCK_KEYS[i]] !== undefined) return true
+  return false
+}
+
+// Until then Omarchy's current value counts as the AC setting (0 = off), and
+// the battery follows it like any battery time that was never set.
+function withSystemLock(settings, seconds) {
+  var s = settings || {}
+  if (s.lockEnabled !== undefined || s.lockMinutes !== undefined) return s
+  var copy = {}
+  for (var k in s) copy[k] = s[k]
+  var v = Math.floor(Number(seconds))
+  copy.lockEnabled = isFinite(v) && v > 0
+  copy.lockMinutes = copy.lockEnabled ? Math.min(MAX_MINUTES, Math.max(1, Math.round(v / 60))) : timings.lock.fallback
+  return copy
+}
+
+// A switch as stored. `omarchy bar set` without --json stores "true" and
+// "false" as text, which must not read as on. Anything else is unset.
+function flag(v) {
+  if (v === true || v === "true") return true
+  if (v === false || v === "false") return false
+  return undefined
+}
+
 function storedMinutes(settings, key) {
   var v = Number(settings ? settings[key] : undefined)
   return isFinite(v) && v >= 0 ? Math.min(MAX_MINUTES, Math.floor(v)) : -1
@@ -47,11 +81,11 @@ function storedMinutes(settings, key) {
 
 function enabled(settings, name, source) {
   var b = battery(name, source)
-  var own = b && settings ? settings[b.flag] : undefined
-  if (own !== undefined && own !== null) return own !== false
+  var own = b && settings ? flag(settings[b.flag]) : undefined
+  if (own !== undefined) return own
   var t = timings[name]
-  var flag = settings ? settings[t.flag] : undefined
-  if (flag !== undefined && flag !== null) return flag !== false
+  var acFlag = settings ? flag(settings[t.flag]) : undefined
+  if (acFlag !== undefined) return acFlag
   var stored = storedMinutes(settings, t.minutes)
   return stored < 0 ? t.on : stored > 0
 }
@@ -60,7 +94,7 @@ function enabled(settings, name, source) {
 var DIM_FALLBACK = 40
 
 function dimEnabled(settings) {
-  return !!settings && settings.screensaverDimEnabled === true
+  return !!settings && flag(settings.screensaverDimEnabled) === true
 }
 
 function dimPercent(settings) {
@@ -76,7 +110,7 @@ var FADE_STEP = { fallback: 5, min: 1, max: 60 }
 var FADE_PERCENT_FALLBACK = 50
 
 function fadeEnabled(settings) {
-  return !!settings && settings.idleDimEnabled === true
+  return !!settings && flag(settings.idleDimEnabled) === true
 }
 
 function fadeValue(settings, key, range) {

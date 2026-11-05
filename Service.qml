@@ -39,7 +39,7 @@ Item {
   }
 
   readonly property int wallpaperMinutes: Settings.effectiveMinutes(settings, "wallpaper")
-  readonly property bool screensaverEnabled: !settings || settings.screensaverEnabled !== false
+  readonly property bool screensaverEnabled: !settings || Settings.flag(settings.screensaverEnabled) !== false
   readonly property int screensaverMinutes: Math.min(Settings.MAX_MINUTES, Math.max(1, num("screensaverMinutes", 5)))
   // Screen off and sleep follow the power source. A switch to or from battery
   // changes the timings, so the idle timers start over with the new ones.
@@ -47,6 +47,15 @@ Item {
   readonly property string powerSource: hasBattery && UPower.onBattery ? "battery" : "ac"
   readonly property int screenOffMinutes: Settings.effectiveMinutes(settings, "screenOff", powerSource)
   readonly property int suspendMinutes: Settings.effectiveMinutes(settings, "suspend", powerSource)
+  // Omarchy's idle lock turns the screen off a few seconds after locking, so
+  // it gets its own times too. Left alone until set in the widget.
+  readonly property bool lockSet: Settings.lockSet(settings)
+  readonly property int systemLockSeconds: {
+    var v = Number(idleConfig ? idleConfig.lock : undefined)
+    return isFinite(v) && v >= 0 ? Math.floor(v) : 300
+  }
+  readonly property var lockSettings: Settings.withSystemLock(settings, systemLockSeconds)
+  readonly property int lockMinutes: Settings.effectiveMinutes(lockSettings, "lock", powerSource)
   readonly property bool dimEnabled: Settings.dimEnabled(settings)
   readonly property int dimPercent: Settings.dimPercent(settings)
   readonly property bool fadeEnabled: Settings.fadeEnabled(settings)
@@ -71,10 +80,15 @@ Item {
     var v = Number(idleConfig ? idleConfig.screensaver : undefined)
     return isFinite(v) && v > 0 ? Math.floor(v) : 150
   }
+  // idle.screensaver 0 turns Omarchy's screensaver off just like its toggle.
+  readonly property bool systemSaverZero: !!idleConfig && idleConfig.screensaver !== undefined
+    && Number(idleConfig.screensaver) === 0
 
   readonly property var applyArgs: [
     saverStateSet ? (screensaverEnabled ? "on" : "off") : "keep",
-    saverMinutesSet ? String(screensaverMinutes) : "keep"
+    saverMinutesSet ? String(screensaverMinutes) : "keep",
+    // 0 turns the lock off.
+    lockSet ? String(lockMinutes) : "keep"
   ]
 
   // Screen off, idle dimming and sleep, each with its own idle timer below.
@@ -414,7 +428,13 @@ Item {
       + " '[(.bar.layout // {})[]?[]?, (.plugins // [])[]?] | any((if type == \"object\" then .id else . end) == $id)'"
       + " \"$4\" >/dev/null 2>&1 && exit 0;"
       + " systemctl --user stop downtime-fade.service downtime-shutdown.timer downtime-shutdown-warn.timer;"
-      + " rm -f \"$2/shutdown-at\"; f=\"$2/dim-saved\"; [[ -f $f ]] || exit 0; ok=1;"
+      + " rm -f \"$2/shutdown-at\";"
+      // Give idle.lock back the value it had before Downtime took it over, so
+      // removing the plugin never leaves the machine without a lock.
+      + " o=\"$2/lock-original\"; if [[ -f $o ]] && t=$(mktemp \"$4.XXXXXX\"); then"
+      + " if jq --argjson v \"$(<\"$o\")\" 'if $v == null then del(.idle.lock) else .idle.lock = $v end' \"$4\" >\"$t\""
+      + " && jq -e . \"$t\" >/dev/null 2>&1; then chmod --reference=\"$4\" \"$t\"; mv -f \"$t\" \"$4\"; rm -f \"$o\"; else rm -f \"$t\"; fi; fi;"
+      + " f=\"$2/dim-saved\"; [[ -f $f ]] || exit 0; ok=1;"
       + " while read -r m v; do omarchy-brightness-display --no-osd --monitor \"$m\" \"$v%\" >/dev/null 2>&1 || ok=0; done <\"$f\";"
       + " (( ok )) && rm -f \"$f\"",
     "downtime-stop", root.pluginId, root.stateDir, root.pluginDir, root.configPath

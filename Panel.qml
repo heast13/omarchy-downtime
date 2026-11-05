@@ -19,8 +19,8 @@ Panel {
   readonly property bool wallpaperEnabled: Settings.enabled(settings, "wallpaper")
   readonly property int wallpaperMinutes: Settings.minutes(settings, "wallpaper")
   // Until the user sets the screensaver here, show what Omarchy currently uses.
-  readonly property bool screensaverEnabled: setting("screensaverEnabled",
-    service ? !service.systemSaverOff : true) !== false
+  readonly property bool screensaverEnabled: Settings.flag(setting("screensaverEnabled",
+    service ? !(service.systemSaverOff || service.systemSaverZero) : true)) !== false
   readonly property int screensaverMinutes: intSetting("screensaverMinutes",
     service ? Math.max(1, Math.round(service.systemSaverSeconds / 60)) : 5, 1)
   readonly property bool dimEnabled: Settings.dimEnabled(settings)
@@ -42,9 +42,15 @@ Panel {
     var start = fadeStart * 60
     var done = start + (brightness - fadePercent) * fadeStep
     var stop = screensaverEnabled ? screensaverMinutes * 60 : (screenOffEnabled ? screenOffMinutes * 60 : 0)
+    var cut = screensaverEnabled ? "fadeCutSaver" : "fadeCutOff"
+    // The lock counts from the last input too and turns the screen off.
+    if (lockEnabled && (stop === 0 || lockMinutes * 60 < stop)) {
+      stop = lockMinutes * 60
+      cut = "fadeCutLock"
+    }
     if (stop > 0 && stop < done) {
       var reached = brightness - Math.max(0, Math.floor((stop - start) / fadeStep))
-      return root.tr(screensaverEnabled ? "fadeCutSaver" : "fadeCutOff", [Math.round(stop / 60), reached])
+      return root.tr(cut, [Math.round(stop / 60), reached])
     }
     var sec = done % 60
     var time = Math.floor(done / 60) + (sec ? ":" + (sec < 10 ? "0" : "") + sec : "") + " " + root.tr("minShort")
@@ -58,6 +64,10 @@ Panel {
   readonly property int screenOffMinutes: Settings.minutes(settings, "screenOff", liveSource)
   readonly property bool suspendEnabled: Settings.enabled(settings, "suspend", liveSource)
   readonly property int suspendMinutes: Settings.minutes(settings, "suspend", liveSource)
+  // Omarchy's idle lock. Until it is set here, Omarchy's own value is shown.
+  readonly property var lockSettings: Settings.withSystemLock(settings, service ? service.systemLockSeconds : 300)
+  readonly property bool lockEnabled: Settings.enabled(lockSettings, "lock", liveSource)
+  readonly property int lockMinutes: Settings.minutes(lockSettings, "lock", liveSource)
   readonly property int shutdownMinutes: Settings.minutes(settings, "shutdown")
   readonly property bool shutdownActive: !!service && service.shutdownActive
   // Weekday only when the deadline is not today, e.g. "Fri 15:32".
@@ -89,12 +99,15 @@ Panel {
   function minutesSummary(on, minutes) { return on ? minutes + " " + root.tr("minShort") : root.tr("offLower") }
 
   // Screen off and sleep on a machine with a battery: "AC 10 min · Battery 5 min".
+  function timingSettings(name) { return name === "lock" ? lockSettings : settings }
+
   function sourceSummary(name) {
-    if (!hasBattery) return minutesSummary(Settings.enabled(settings, name, "ac"), Settings.minutes(settings, name, "ac"))
+    var s = timingSettings(name)
+    if (!hasBattery) return minutesSummary(Settings.enabled(s, name, "ac"), Settings.minutes(s, name, "ac"))
     return ["ac", "battery"].map(function(source) {
-      var on = Settings.enabled(settings, name, source)
+      var on = Settings.enabled(s, name, source)
       return root.tr(source + "Short") + " "
-        + (on ? Settings.minutes(settings, name, source) + " " + root.tr("minShort") : root.tr("offLower").toLowerCase())
+        + (on ? Settings.minutes(s, name, source) + " " + root.tr("minShort") : root.tr("offLower").toLowerCase())
     }).join(" · ")
   }
 
@@ -112,6 +125,12 @@ Panel {
   function persistTiming(name, on, minutes, source) {
     var keys = Settings.keys(name, source)
     var values = {}
+    // The first change takes over Omarchy's idle.lock as a whole, so the AC
+    // time shown so far is stored too: it is about to be overwritten.
+    if (name === "lock" && !Settings.lockSet(settings)) {
+      values.lockEnabled = Settings.enabled(lockSettings, "lock", "ac")
+      values.lockMinutes = Settings.minutes(lockSettings, "lock", "ac")
+    }
     values[keys.flag] = on
     values[keys.minutes] = minutes
     root.persist(values)
@@ -227,14 +246,14 @@ Panel {
     }
   }
 
-  // Screen off or sleep for one power source: its own switch and minutes.
+  // Screen off, lock or sleep for one power source: its own switch and minutes.
   component SourceRow: Item {
     id: sourceRow
 
     property string name: ""
     property string source: "ac"
-    readonly property bool on: Settings.enabled(root.settings, name, source)
-    readonly property int minutes: Settings.minutes(root.settings, name, source)
+    readonly property bool on: Settings.enabled(root.timingSettings(name), name, source)
+    readonly property int minutes: Settings.minutes(root.timingSettings(name), name, source)
 
     width: parent ? parent.width : 0
     implicitHeight: stepper.implicitHeight
@@ -396,7 +415,7 @@ Panel {
 
         Note {
           visible: !!root.service && root.service.stayAwake
-            && (root.screenOffEnabled || root.suspendEnabled || (root.fadeEnabled && root.dimSupported))
+            && (root.screenOffEnabled || root.lockEnabled || root.suspendEnabled || (root.fadeEnabled && root.dimSupported))
           text: root.tr("stayAwake")
         }
 
@@ -449,7 +468,14 @@ Panel {
           title: root.tr("screensaver")
           summary: root.minutesSummary(root.screensaverEnabled, root.screensaverMinutes)
           checked: root.screensaverEnabled
-          onToggled: root.persist({ screensaverEnabled: !root.screensaverEnabled })
+          onToggled: {
+            var values = { screensaverEnabled: !root.screensaverEnabled }
+            // With idle.screensaver at 0 the switch alone would change nothing.
+            if (values.screensaverEnabled && root.service && root.service.systemSaverZero
+                && (!root.settings || root.settings.screensaverMinutes === undefined))
+              values.screensaverMinutes = root.screensaverMinutes
+            root.persist(values)
+          }
 
           Stepper {
             inline: true
@@ -605,6 +631,50 @@ Panel {
             visible: root.hasBattery && !Settings.batteryOwn(root.settings, "screenOff")
             text: root.tr("batteryFollows")
           }
+
+          // Omarchy's lock blanks the screen on its own, whatever is set here.
+          Note {
+            visible: !root.screenOffEnabled && root.lockEnabled
+            text: root.tr("screenOffByLock", root.lockMinutes)
+            color: root.fg
+          }
+        }
+
+        // ---------- Lock ----------
+        // Omarchy's own idle lock (idle.lock), with its own times on battery.
+        Section {
+          name: "lock"
+          title: root.tr("lock")
+          summary: root.sourceSummary("lock")
+          switchable: !root.hasBattery
+          checked: root.lockEnabled
+          onToggled: root.persistTiming("lock", !root.lockEnabled, root.lockMinutes, "ac")
+
+          Stepper {
+            visible: !root.hasBattery
+            inline: true
+            width: parent.width
+            enabled: root.lockEnabled
+            opacity: enabled ? 1 : 0.4
+            label: root.tr("lockAfter")
+            fieldWidth: Style.space(110)
+            foreground: root.fg
+            fontFamily: root.fontFamily
+            from: 1
+            to: Settings.MAX_MINUTES
+            value: root.lockMinutes
+            onModified: function(v) { root.persistTiming("lock", true, v, "ac") }
+          }
+
+          SourceRow { visible: root.hasBattery; name: "lock"; source: "ac" }
+          SourceRow { visible: root.hasBattery; name: "lock"; source: "battery" }
+
+          Note {
+            visible: root.hasBattery && !Settings.batteryOwn(root.settings, "lock")
+            text: root.tr("batteryFollows")
+          }
+
+          Note { text: root.tr("lockNote") }
         }
 
         // ---------- Sleep ----------
